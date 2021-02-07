@@ -11,7 +11,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, include = FALSE}
 library(tibble)
 library(ggpubr)
 library(devtools)
@@ -27,54 +27,57 @@ library(lmerTest)
 library(lme4)
 ```
 
-```{r, warnings = FALSE}
-ERP <- rbind(read.csv("EXP2.csv"), read.csv("EXP1_pt1.csv"), read.csv("EXP1_pt2.csv")) %>% 
-            filter_if(~is.numeric(.), all_vars(!is.infinite(.)))
+```{r}
+matplotlibRdBu_r <- colorRampPalette(c("#053061","#4694C4","#F6F6F6","#E7886C","#67001F"), interpolate = "spline")
 
-ERP <- ERP[(ERP$time >= -100) & (ERP$time <= 700),]
-ERP <- gather(ERP, electrode, amplitude, Fp1:T8, factor_key=TRUE)
-ERP$time <- format(round(ERP$time, 0), nsmall = 0) 
-ERP$time <- as.numeric(as.character(ERP$time))
-names(ERP) <- c("subject", "block", "condition", "time", "electrode", "amplitude")
-
-ERP <- filter(ERP, subject != "207")
-
-electrodeLocs <- read_delim("https://raw.githubusercontent.com/craddm/ExploringERPs/master/biosemi70elecs.loc", "\t",
-  escape_double = FALSE,
-  col_names = c("chanNo","theta","radius", "electrode"),
-  trim_ws = TRUE)
-
-ERP$electrode <- as.factor(ERP$electrode)
-ERP$subject <- as.factor(ERP$subject)
-ERP$BLOCK <- as.factor(ERP$block)
-
-ERP$time <- as.factor(ERP$time)
-ERP <- ERP %>% group_by(subject, block, condition, electrode, time) %>% 
-  summarise(amplitude.mean=mean(amplitude),) %>% 
-  ungroup  
-ERP$time <- as.numeric(as.character(ERP$time))
-
-ERP_testing <- ERP
-ERP_testing$time <- as.double(ERP_testing$time)
-ERP_testing$amplitude.mean <- as.double(ERP_testing$amplitude.mean)
-
-electrodeLocs$radianTheta <- pi/180*electrodeLocs$theta
-electrodeLocs <- electrodeLocs %>%
-  mutate(x = .$radius*sin(.$radianTheta), y = .$radius*cos(.$radianTheta))
-
-ERP <- ERP %>% left_join(electrodeLocs, by = "electrode")
-
-ERP$amplitude.mean <- as.numeric(ERP$amplitude.mean)
-ERP$electrode <- as.factor(ERP$electrode)
-
-ERP <- filter(ERP, amplitude.mean <= 7 & amplitude.mean >= -7)
-ERP$amplitude.mean <- format(round(ERP$amplitude.mean, 2), nsmall = 2)
-ERP$amplitude.mean <- as.numeric(ERP$amplitude.mean)
+loc_path <- "https://raw.githubusercontent.com/craddm/ExploringERPs/master/biosemi70elecs.loc"
 
 ERP_123 = c("steelblue", "palevioletred1", "limegreen")
 sign_col <- "indianred"
 ERP_CTB = c("skyblue4", "palegreen3")
 ERP_TTB = c("palevioletred1", "palegreen3")
+```
+
+
+```{r, warnings = FALSE}
+ERP <- rbind(read.csv("EXP2.csv"), read.csv("EXP1_pt1.csv"), read.csv("EXP1_pt2.csv")) %>% 
+  filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %>%
+  filter(time >= -100 | time <= 800) %>% 
+  gather(electrode, amplitude, Fp1:T8, factor_key = TRUE) %>%
+  mutate(time = as.numeric(as.character(format(round(time, 0), nsmall = 0))),
+         Subj = as.factor(Subj),
+         Block = as.factor(Block))
+
+names(ERP) <- c("subject", "block", "condition", "time", "electrode", "amplitude")
+```
+
+```{r, messages = FALSE}
+electrodeLocs <- read_delim(loc_path, "\t",
+  escape_double = FALSE,
+  col_names = c("chanNo","theta","radius", "electrode"),
+  trim_ws = TRUE)
+
+ERP <- ERP %>% 
+  mutate(time = as.factor(time)) %>%
+  group_by(subject, block, condition, electrode, time) %>% 
+  summarise(amplitude.mean = mean(amplitude),) %>% 
+  ungroup() %>%
+  mutate(time = as.numeric(as.character(time)), 
+         subject != "207")
+
+ERP_testing <- ERP %>%
+  mutate(time = as.double(time), 
+         amplitude.mean = as.double(amplitude.mean))
+
+electrodeLocs <- electrodeLocs %>%
+  mutate(radianTheta <- pi / 180 * theta,
+          x = radius * sin(radianTheta), y = radius * cos(radianTheta))
+
+ERP <- ERP %>% left_join(electrodeLocs, by = "electrode") %>%
+  mutate(amplitude.meean = as.numeric(amplitude.mean), 
+         electrode = as.factor(electrode)) %>%
+  filter(amplitude.mean <= 20 & amplitude.mean >= -20) %>%
+  mutate(amplitude.mean <- as.numeric(format(round(amplitude.mean, 2), nsmall = 2)))
 ```
 
 ```{r}
@@ -280,17 +283,15 @@ gavglme <- function(TP1, TP2, where) {
   pfl$side = "left"
 
   lme_data <- rbind(fr, fl, fcr, fcl, cr, cl, pr, pl, pfr, pfl)
-  lme_data <- filter(lme_data, region == where) # remove this line and change model to avg.mean ~ condition * region for full region / condition interactions. 
+  lme_data <- filter(lme_data, region == where)
   
   m <- lmer(avg.mean ~ condition * side + (1 + condition | subject), lme_data)
   n <- summary(m)
   
   return(n) }
-  
-  # random sample model
+
   gavglme(575, 625, "parietal")
 ```
-
 
 ```{r}
 anterior_frontal <- ggarrange(
@@ -470,6 +471,8 @@ headShape <- circleFun(c(0, 0), round(max(electrodeLocs$x)), npoints = 100)
 nose <- data.frame(x = c(-0.075, 0, .075), y=c(.495, .575, .495))
 ```
 
+Function to create scalp plots with data at a given time point. Change electrode and timepoint at the bottom of the chunk to see different results. 
+
 ```{r}
 int_scalp_plot <- function(TP1, TP2, cond = "control") {
   
@@ -530,8 +533,6 @@ final_plot <- ggarrange(
   common.legend = TRUE)
 
 return(final_plot) }
-
-# some of these pictures will look different than on the thesis. This is because I manually changed scales for some of these pictures before printing them (e.g. one picture might have a -5 to 5 mV scale.. another might have a -2 to +2 mV). I tried to automate it in the function but results were mixed so I ended up changing those values with trial and error. 
 
 n1 <- int_compare_scalps(90, 110)
 ggsave("./pictures/scalp_n1.png", n1, width = 9, height = 5, dpi = "print")
