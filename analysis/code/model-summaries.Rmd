@@ -1,0 +1,83 @@
+---
+title: "Experiment 2: Data modelling"
+author: "Massimiliano Canzi"
+date: "20/02/2021"
+output: html_document
+---
+
+```{r, message = F}
+library(emmeans)
+library(lme4)
+library(lmerTest)
+library(magrittr)
+library(tidyverse)
+```
+
+```{r readr.1, message = FALSE}
+ERP <- bind_rows(read.csv("../data/EXP2.csv"), read.csv("../data/EXP1_pt1.csv"),
+                 read.csv("../data/EXP1_pt2.csv")) %>% 
+  filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %>%
+  filter(time >= -100 & time <= 800) %>% na.omit() %>%
+  gather(electrode, amplitude, Fp1:T8, factor_key = TRUE) %>%
+  mutate(time = as.numeric(as.character(format(round(time, 0), nsmall = 0))),
+         Subj = as.factor(Subj),
+         Block = as.factor(Block))
+
+names(ERP) <- c("subject", "block", "condition", "time", "electrode", "amplitude")
+```
+
+```{r readr.2, message = FALSE}
+ERP %<>% filter(subject != "207") %>%
+  mutate(time = as.factor(time)) %>%
+  group_by(subject, block, condition, electrode, time) %>% 
+  summarise(amplitude.mean = mean(amplitude),) %>% 
+  ungroup() %>% mutate(time = as.numeric(as.character(time)), 
+                       amplitude.mean = as.numeric(amplitude.mean), 
+                       electrode = as.factor(electrode)) %>%
+  filter(amplitude.mean <= 20 & amplitude.mean >= -20) %>%
+  mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2)))
+```
+
+```{r, summarised.model, message = F}
+summarised.model <- function(TP1, TP2, type = "lmer") {
+  
+  lmer.data <- left_join(ERP %>% 
+    filter(condition == "control" | condition == "target") %>% 
+    filter(time >= TP1) %>%
+    filter(time <= TP2) %>%
+    filter(block == "ATT") %>%
+    group_by(subject, block, condition, electrode) %>%
+    summarise(avg.mean = mean(amplitude.mean),) %>%
+    ungroup(), read.csv("../resources/lmer_electrodes.csv", 
+                        sep = ";"), by = "electrode")
+  
+  if (type == "lmer") {
+    
+    m <- lmer.data %>% 
+      lmer(formula = avg.mean ~ condition * region + side + (1 + condition | subject)) }
+  
+  if (type == "lm") {
+    
+    m <- lmer.data %>%
+      lm(formula = avg.mean ~ condition * region + side) }
+
+  return(m) }
+```
+
+```{r, message = F}
+anova(summarised.model(75, 125, type = "lmer"))
+emmeans(summarised.model(75, 125, "lmer"), pairwise ~ condition | region)
+```
+
+```{r, message = F}
+anova(summarised.model(150, 200, type = "lmer"))
+```
+
+```{r, message = F}
+anova(summarised.model(290, 310, type = "lmer"))
+```
+
+```{r, message = F}
+anova(summarised.model(575, 625, type = "lmer"))
+emmeans(summarised.model(75, 125, "lmer"), pairwise ~ condition | region)
+```
