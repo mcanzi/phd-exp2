@@ -200,18 +200,17 @@ library(lme4)
 library(lmerTest)
 library(magrittr)
 library(tidyverse)</code></pre>
-<pre class="r"><code>ERP &lt;- bind_rows(read.csv(&quot;../data/EXP2.csv&quot;), read.csv(&quot;../data/EXP1_pt1.csv&quot;),
-                 read.csv(&quot;../data/EXP1_pt2.csv&quot;)) %&gt;% 
-  filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %&gt;%
-  filter(time &gt;= -100 &amp; time &lt;= 800) %&gt;% na.omit() %&gt;%
+<pre class="r"><code>ERP &lt;- read_csv(&quot;../data/EXP2.lmer.csv&quot;) %&gt;%
+  filter(Cond == &quot;target&quot; | Cond == &quot;control&quot;) %&gt;%
+  mutate(Subj = as.factor(Subj)) %&gt;%
+  # filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %&gt;%
+  filter(time &gt;= -100 &amp; time &lt;= 700) %&gt;%
   gather(electrode, amplitude, Fp1:T8, factor_key = TRUE) %&gt;%
   mutate(time = as.numeric(as.character(format(round(time, 0), nsmall = 0))),
-         Subj = as.factor(Subj),
          Block = as.factor(Block))
 
 names(ERP) &lt;- c(&quot;subject&quot;, &quot;block&quot;, &quot;condition&quot;, &quot;time&quot;, &quot;electrode&quot;, &quot;amplitude&quot;)</code></pre>
-<pre class="r"><code>ERP %&lt;&gt;% filter(subject != &quot;207&quot;) %&gt;%
-  mutate(time = as.factor(time)) %&gt;%
+<pre class="r"><code>ERP %&lt;&gt;% mutate(time = as.factor(time), subject = as.factor(subject)) %&gt;%
   group_by(subject, block, condition, electrode, time) %&gt;% 
   summarise(amplitude.mean = mean(amplitude),) %&gt;% 
   ungroup() %&gt;% mutate(time = as.numeric(as.character(time)), 
@@ -221,14 +220,13 @@ names(ERP) &lt;- c(&quot;subject&quot;, &quot;block&quot;, &quot;condition&quot;
   mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2)))</code></pre>
 <pre class="r"><code>summarised.model &lt;- function(TP1, TP2, type = &quot;lmer&quot;) {
   
-  lmer.data &lt;- left_join(ERP %&gt;% 
-    filter(condition == &quot;control&quot; | condition == &quot;target&quot;) %&gt;% 
+  lmer.data &lt;- left_join(ERP %&gt;%
     filter(time &gt;= TP1) %&gt;%
     filter(time &lt;= TP2) %&gt;%
     filter(block == &quot;ATT&quot;) %&gt;%
     group_by(subject, block, condition, electrode) %&gt;%
-    summarise(avg.mean = mean(amplitude.mean),) %&gt;%
-    ungroup(), read.csv(&quot;../resources/lmer_electrodes.csv&quot;, 
+    summarise(avg.mean = mean(amplitude.mean),) %&gt;% ungroup,
+    read.csv(&quot;../resources/lmer_electrodes.csv&quot;, 
                         sep = &quot;;&quot;), by = &quot;electrode&quot;)
   
   if (type == &quot;lmer&quot;) {
@@ -242,276 +240,401 @@ names(ERP) &lt;- c(&quot;subject&quot;, &quot;block&quot;, &quot;condition&quot;
       lm(formula = avg.mean ~ condition * region + side) }
 
   return(m) }</code></pre>
-<pre class="r"><code>anova(summarised.model(75, 125, type = &quot;lmer&quot;))</code></pre>
-<pre><code>## Type III Analysis of Variance Table with Satterthwaite&#39;s method
-##                  Sum Sq Mean Sq NumDF DenDF F value    Pr(&gt;F)    
-## condition         0.239  0.2386     1  1423  0.8315     0.362    
-## region           56.454  5.1322    11  1423 17.8844 &lt; 2.2e-16 ***
-## side             15.630  7.8149     2  1423 27.2332 2.475e-12 ***
-## condition:region 24.091  2.1901    11  1423  7.6321 6.538e-13 ***
+<pre class="r"><code>anova(summarised.model(75, 125, type = &quot;lm&quot;))</code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;subject&#39;, &#39;block&#39;, &#39;condition&#39;. You can override using the `.groups` argument.</code></pre>
+<pre><code>## Analysis of Variance Table
+## 
+## Response: avg.mean
+##                    Df Sum Sq Mean Sq F value    Pr(&gt;F)    
+## condition           1   0.13  0.1273  0.3908    0.5319    
+## region             11  56.05  5.0952 15.6412 &lt; 2.2e-16 ***
+## side                2  20.55 10.2759 31.5447 3.055e-14 ***
+## condition:region   11  18.30  1.6638  5.1075 5.979e-08 ***
+## Residuals        2297 748.26  0.3258                      
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<pre class="r"><code>emmeans(summarised.model(75, 125, &quot;lmer&quot;), pairwise ~ condition | region)</code></pre>
+<pre class="r"><code>emmeans(summarised.model(75, 125, &quot;lm&quot;), pairwise ~ condition | region)</code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;subject&#39;, &#39;block&#39;, &#39;condition&#39;. You can override using the `.groups` argument.</code></pre>
 <pre><code>## $emmeans
 ## region = anteriofrontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.1656 0.0725  815  0.02330   0.3080
-##  target    -0.1647 0.0694  855 -0.30089  -0.0285
+##  control   -0.0056 0.0604 2297 -0.12396   0.1128
+##  target    -0.2825 0.0588 2297 -0.39772  -0.1673
 ## 
 ## region = central:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.1921 0.0617  569  0.07098   0.3132
-##  target     0.1240 0.0590  608  0.00812   0.2400
+##  control    0.0982 0.0513 2297 -0.00240   0.1989
+##  target     0.0859 0.0500 2297 -0.01208   0.1839
 ## 
 ## region = centroparietal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.0680 0.0617  569 -0.18912   0.0531
-##  target    -0.0272 0.0590  608 -0.14308   0.0888
+##  control   -0.0788 0.0513 2297 -0.17945   0.0218
+##  target    -0.0100 0.0500 2297 -0.10803   0.0880
 ## 
 ## region = frontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.3450 0.0548  409  0.23739   0.4527
-##  target     0.0462 0.0524  442 -0.05686   0.1493
+##  control    0.1644 0.0456 2297  0.07499   0.2537
+##  target    -0.0636 0.0444 2297 -0.15062   0.0235
 ## 
 ## region = frontocentral:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.3780 0.0617  569  0.25691   0.4991
-##  target     0.1707 0.0590  608  0.05476   0.2866
+##  control    0.2235 0.0513 2297  0.12285   0.3241
+##  target     0.0906 0.0500 2297 -0.00735   0.1886
 ## 
 ## region = frontotemporal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.2787 0.1152 1304  0.05278   0.5046
-##  target     0.2320 0.1103 1319  0.01564   0.4484
+##  control    0.2384 0.0959 2297  0.05030   0.4264
+##  target     0.2093 0.0934 2297  0.02620   0.3924
 ## 
 ## region = none:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.5070 0.1641 1398 -0.82887  -0.1850
-##  target    -0.0164 0.1573 1403 -0.32501   0.2922
+##  control   -0.4369 0.1367 2297 -0.70492  -0.1688
+##  target    -0.0521 0.1332 2297 -0.31324   0.2091
 ## 
 ## region = occipital:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.5087 0.0933 1145 -0.69175  -0.3257
-##  target    -0.0770 0.0893 1172 -0.25214   0.0982
+##  control   -0.3942 0.0777 2297 -0.54650  -0.2419
+##  target    -0.1963 0.0756 2297 -0.34450  -0.0480
 ## 
 ## region = parietal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.3480 0.0499  305 -0.44615  -0.2498
-##  target    -0.0508 0.0478  333 -0.14478   0.0433
+##  control   -0.2562 0.0415 2297 -0.33764  -0.1748
+##  target    -0.0616 0.0405 2297 -0.14091   0.0178
 ## 
 ## region = parietooccipital:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.4384 0.0725  815 -0.58074  -0.2961
-##  target    -0.1618 0.0694  855 -0.29804  -0.0256
+##  control   -0.3235 0.0604 2297 -0.44187  -0.2051
+##  target    -0.2116 0.0588 2297 -0.32686  -0.0964
 ## 
 ## region = prefrontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.0184 0.1152 1304 -0.20753   0.2443
-##  target    -0.3351 0.1103 1319 -0.55146  -0.1187
+##  control   -0.1206 0.0959 2297 -0.30870   0.0674
+##  target    -0.4640 0.0934 2297 -0.64707  -0.2808
 ## 
 ## region = temporal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.0178 0.0821  993 -0.14325   0.1789
-##  target     0.1731 0.0787 1030  0.01877   0.3275
+##  control    0.0954 0.0703 2297 -0.04236   0.2332
+##  target     0.1230 0.0684 2297 -0.01106   0.2570
 ## 
 ## Results are averaged over the levels of: side 
-## Degrees-of-freedom method: kenward-roger 
 ## Confidence level used: 0.95 
 ## 
 ## $contrasts
 ## region = anteriofrontal:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.3303 0.1000  837  3.302  0.0010 
+##  control - target   0.2769 0.0840 2297  3.298  0.0010 
 ## 
 ## region = central:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.0680 0.0846  581  0.805  0.4213 
+##  control - target   0.0123 0.0710 2297  0.174  0.8622 
 ## 
 ## region = centroparietal:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.0409 0.0846  581 -0.483  0.6291 
+##  control - target  -0.0688 0.0710 2297 -0.969  0.3325 
 ## 
 ## region = frontal:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.2988 0.0746  410  4.007  0.0001 
+##  control - target   0.2279 0.0626 2297  3.642  0.0003 
 ## 
 ## region = frontocentral:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.2073 0.0846  581  2.452  0.0145 
+##  control - target   0.1328 0.0710 2297  1.872  0.0613 
 ## 
 ## region = frontotemporal:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.0467 0.1581 1310  0.295  0.7680 
+##  control - target   0.0290 0.1327 2297  0.219  0.8269 
 ## 
 ## region = none:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.4905 0.2236 1400 -2.194  0.0284 
+##  control - target  -0.3848 0.1877 2297 -2.050  0.0405 
 ## 
 ## region = occipital:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.4318 0.1291 1163 -3.344  0.0009 
+##  control - target  -0.1979 0.1084 2297 -1.826  0.0680 
 ## 
 ## region = parietal:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.2972 0.0675  299 -4.405  &lt;.0001 
+##  control - target  -0.1947 0.0566 2297 -3.439  0.0006 
 ## 
 ## region = parietooccipital:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.2766 0.1000  837 -2.765  0.0058 
+##  control - target  -0.1119 0.0840 2297 -1.333  0.1828 
 ## 
 ## region = prefrontal:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.3535 0.1581 1310  2.235  0.0256 
+##  control - target   0.3433 0.1327 2297  2.586  0.0098 
 ## 
 ## region = temporal:
 ##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.1553 0.1118  996 -1.389  0.1653 
+##  control - target  -0.0275 0.0965 2297 -0.285  0.7754 
 ## 
-## Results are averaged over the levels of: side 
-## Degrees-of-freedom method: kenward-roger</code></pre>
-<pre class="r"><code>anova(summarised.model(150, 200, type = &quot;lmer&quot;))</code></pre>
-<pre><code>## Type III Analysis of Variance Table with Satterthwaite&#39;s method
-##                   Sum Sq Mean Sq NumDF DenDF F value    Pr(&gt;F)    
-## condition          0.374   0.374     1  1423  0.3701    0.5430    
-## region           171.942  15.631    11  1423 15.4741 &lt; 2.2e-16 ***
-## side              68.297  34.149     2  1423 33.8056 4.534e-15 ***
-## condition:region  12.571   1.143    11  1423  1.1314    0.3322    
+## Results are averaged over the levels of: side</code></pre>
+<pre class="r"><code>anova(summarised.model(150, 200, type = &quot;lm&quot;))</code></pre>
+<pre><code>## Analysis of Variance Table
+## 
+## Response: avg.mean
+##                    Df  Sum Sq Mean Sq F value    Pr(&gt;F)    
+## condition           1    1.22   1.220  0.9481    0.3303    
+## region             11  312.09  28.372 22.0431 &lt; 2.2e-16 ***
+## side                2   78.77  39.383 30.5976 7.684e-14 ***
+## condition:region   11   18.87   1.715  1.3326    0.1996    
+## Residuals        2297 2956.51   1.287                      
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<pre class="r"><code>anova(summarised.model(290, 310, type = &quot;lmer&quot;))</code></pre>
-<pre><code>## Type III Analysis of Variance Table with Satterthwaite&#39;s method
-##                  Sum Sq Mean Sq NumDF DenDF F value  Pr(&gt;F)    
-## condition          1.06   1.059     1  1423  0.7446 0.38835    
-## region           879.37  79.942    11  1423 56.2156 &lt; 2e-16 ***
-## side             151.22  75.609     2  1423 53.1681 &lt; 2e-16 ***
-## condition:region  28.06   2.551    11  1423  1.7936 0.05028 .  
+<pre class="r"><code>anova(summarised.model(280, 320, type = &quot;lm&quot;))</code></pre>
+<pre><code>## Analysis of Variance Table
+## 
+## Response: avg.mean
+##                    Df Sum Sq Mean Sq  F value    Pr(&gt;F)    
+## condition           1    2.8   2.803   1.8170 0.1778079    
+## region             11 1798.4 163.491 105.9905 &lt; 2.2e-16 ***
+## side                2  272.7 136.336  88.3855 &lt; 2.2e-16 ***
+## condition:region   11   53.9   4.901   3.1775 0.0002717 ***
+## Residuals        2297 3543.1   1.543                       
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<pre class="r"><code>anova(summarised.model(575, 625, type = &quot;lmer&quot;))</code></pre>
-<pre><code>## Type III Analysis of Variance Table with Satterthwaite&#39;s method
-##                  Sum Sq Mean Sq NumDF DenDF  F value    Pr(&gt;F)    
-## condition          20.2   20.17     1  1423   7.5617  0.006038 ** 
-## region           6688.2  608.02    11  1423 227.9289 &lt; 2.2e-16 ***
-## side              206.5  103.23     2  1423  38.7001 &lt; 2.2e-16 ***
-## condition:region  828.2   75.29    11  1423  28.2238 &lt; 2.2e-16 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<pre class="r"><code>emmeans(summarised.model(75, 125, &quot;lmer&quot;), pairwise ~ condition | region)</code></pre>
+<pre class="r"><code>emmeans(summarised.model(280, 320, &quot;lm&quot;), pairwise ~ condition | region)</code></pre>
 <pre><code>## $emmeans
 ## region = anteriofrontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.1656 0.0725  815  0.02330   0.3080
-##  target    -0.1647 0.0694  855 -0.30089  -0.0285
+##  control   -1.6691 0.1313 2297  -1.9267  -1.4116
+##  target    -1.5889 0.1279 2297  -1.8397  -1.3382
 ## 
 ## region = central:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.1921 0.0617  569  0.07098   0.3132
-##  target     0.1240 0.0590  608  0.00812   0.2400
+##  control    1.0711 0.1117 2297   0.8521   1.2901
+##  target     0.9775 0.1087 2297   0.7642   1.1907
 ## 
 ## region = centroparietal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.0680 0.0617  569 -0.18912   0.0531
-##  target    -0.0272 0.0590  608 -0.14308   0.0888
+##  control    1.2662 0.1117 2297   1.0472   1.4852
+##  target     0.9835 0.1087 2297   0.7702   1.1967
 ## 
 ## region = frontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.3450 0.0548  409  0.23739   0.4527
-##  target     0.0462 0.0524  442 -0.05686   0.1493
+##  control   -0.5923 0.0992 2297  -0.7867  -0.3978
+##  target    -0.3579 0.0966 2297  -0.5473  -0.1685
 ## 
 ## region = frontocentral:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.3780 0.0617  569  0.25691   0.4991
-##  target     0.1707 0.0590  608  0.05476   0.2866
+##  control    0.6019 0.1117 2297   0.3829   0.8208
+##  target     0.7225 0.1087 2297   0.5093   0.9358
 ## 
 ## region = frontotemporal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.2787 0.1152 1304  0.05278   0.5046
-##  target     0.2320 0.1103 1319  0.01564   0.4484
+##  control   -0.6189 0.2087 2297  -1.0281  -0.2096
+##  target    -0.0523 0.2032 2297  -0.4508   0.3462
 ## 
 ## region = none:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.5070 0.1641 1398 -0.82887  -0.1850
-##  target    -0.0164 0.1573 1403 -0.32501   0.2922
+##  control   -1.2470 0.2975 2297  -1.8303  -0.6637
+##  target    -1.3814 0.2898 2297  -1.9496  -0.8131
 ## 
 ## region = occipital:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.5087 0.0933 1145 -0.69175  -0.3257
-##  target    -0.0770 0.0893 1172 -0.25214   0.0982
+##  control   -0.1013 0.1690 2297  -0.4327   0.2301
+##  target    -0.5468 0.1645 2297  -0.8694  -0.2243
 ## 
 ## region = parietal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.3480 0.0499  305 -0.44615  -0.2498
-##  target    -0.0508 0.0478  333 -0.14478   0.0433
+##  control    0.7736 0.0903 2297   0.5965   0.9508
+##  target     0.4789 0.0880 2297   0.3063   0.6515
 ## 
 ## region = parietooccipital:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.4384 0.0725  815 -0.58074  -0.2961
-##  target    -0.1618 0.0694  855 -0.29804  -0.0256
+##  control    0.7173 0.1313 2297   0.4597   0.9748
+##  target     0.0973 0.1279 2297  -0.1534   0.3480
 ## 
 ## region = prefrontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.0184 0.1152 1304 -0.20753   0.2443
-##  target    -0.3351 0.1103 1319 -0.55146  -0.1187
+##  control   -2.1255 0.2087 2297  -2.5347  -1.7163
+##  target    -2.1681 0.2032 2297  -2.5666  -1.7696
 ## 
 ## region = temporal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.0178 0.0821  993 -0.14325   0.1789
-##  target     0.1731 0.0787 1030  0.01877   0.3275
+##  control   -0.2287 0.1529 2297  -0.5285   0.0712
+##  target     0.2165 0.1487 2297  -0.0752   0.5081
 ## 
 ## Results are averaged over the levels of: side 
-## Degrees-of-freedom method: kenward-roger 
 ## Confidence level used: 0.95 
 ## 
 ## $contrasts
 ## region = anteriofrontal:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.3303 0.1000  837  3.302  0.0010 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target  -0.0802 0.183 2297 -0.439  0.6607 
 ## 
 ## region = central:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.0680 0.0846  581  0.805  0.4213 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   0.0936 0.154 2297  0.606  0.5444 
 ## 
 ## region = centroparietal:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.0409 0.0846  581 -0.483  0.6291 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   0.2828 0.154 2297  1.831  0.0672 
 ## 
 ## region = frontal:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.2988 0.0746  410  4.007  0.0001 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target  -0.2344 0.136 2297 -1.721  0.0853 
 ## 
 ## region = frontocentral:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.2073 0.0846  581  2.452  0.0145 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target  -0.1206 0.154 2297 -0.781  0.4347 
 ## 
 ## region = frontotemporal:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.0467 0.1581 1310  0.295  0.7680 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target  -0.5666 0.289 2297 -1.961  0.0500 
 ## 
 ## region = none:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.4905 0.2236 1400 -2.194  0.0284 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   0.1344 0.409 2297  0.329  0.7422 
 ## 
 ## region = occipital:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.4318 0.1291 1163 -3.344  0.0009 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   0.4456 0.236 2297  1.889  0.0590 
 ## 
 ## region = parietal:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.2972 0.0675  299 -4.405  &lt;.0001 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   0.2947 0.123 2297  2.393  0.0168 
 ## 
 ## region = parietooccipital:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.2766 0.1000  837 -2.765  0.0058 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   0.6199 0.183 2297  3.393  0.0007 
 ## 
 ## region = prefrontal:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target   0.3535 0.1581 1310  2.235  0.0256 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   0.0426 0.289 2297  0.147  0.8828 
 ## 
 ## region = temporal:
-##  contrast         estimate     SE   df t.ratio p.value
-##  control - target  -0.1553 0.1118  996 -1.389  0.1653 
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target  -0.4451 0.210 2297 -2.120  0.0341 
+## 
+## Results are averaged over the levels of: side</code></pre>
+<pre class="r"><code>anova(summarised.model(575, 625, type = &quot;lm&quot;))</code></pre>
+<pre><code>## Analysis of Variance Table
+## 
+## Response: avg.mean
+##                    Df  Sum Sq Mean Sq  F value Pr(&gt;F)    
+## condition           1     0.9    0.87   0.2871 0.5921    
+## region             11 10632.5  966.60 317.7275 &lt;2e-16 ***
+## side                2   231.3  115.64  38.0115 &lt;2e-16 ***
+## condition:region   11   967.6   87.96  28.9141 &lt;2e-16 ***
+## Residuals        2297  6988.0    3.04                    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<pre class="r"><code>emmeans(summarised.model(574, 625, &quot;lm&quot;), pairwise ~ condition | region)</code></pre>
+<pre><code>## $emmeans
+## region = anteriofrontal:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control   -2.5271 0.184 2297  -2.8886  -2.1656
+##  target    -4.7545 0.179 2297  -5.1065  -4.4026
+## 
+## region = central:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control    0.6038 0.157 2297   0.2964   0.9111
+##  target     1.1523 0.153 2297   0.8530   1.4516
+## 
+## region = centroparietal:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control    1.2490 0.157 2297   0.9416   1.5563
+##  target     2.6157 0.153 2297   2.3164   2.9150
+## 
+## region = frontal:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control   -1.6372 0.139 2297  -1.9101  -1.3643
+##  target    -2.9693 0.136 2297  -3.2352  -2.7035
+## 
+## region = frontocentral:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control   -0.3501 0.157 2297  -0.6575  -0.0428
+##  target    -0.6622 0.153 2297  -0.9615  -0.3629
+## 
+## region = frontotemporal:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control   -0.5481 0.293 2297  -1.1224   0.0262
+##  target    -1.6981 0.285 2297  -2.2573  -1.1388
+## 
+## region = none:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control    0.7353 0.417 2297  -0.0835   1.5540
+##  target     0.3541 0.407 2297  -0.4435   1.1516
+## 
+## region = occipital:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control    1.4131 0.237 2297   0.9480   1.8783
+##  target     2.2125 0.231 2297   1.7597   2.6652
+## 
+## region = parietal:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control    1.5975 0.127 2297   1.3489   1.8461
+##  target     2.8678 0.124 2297   2.6255   3.1101
+## 
+## region = parietooccipital:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control    1.7969 0.184 2297   1.4354   2.1584
+##  target     3.1861 0.179 2297   2.8342   3.5380
+## 
+## region = prefrontal:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control   -2.7799 0.293 2297  -3.3542  -2.2055
+##  target    -5.5249 0.285 2297  -6.0841  -4.9656
+## 
+## region = temporal:
+##  condition  emmean    SE   df lower.CL upper.CL
+##  control    0.2967 0.215 2297  -0.1242   0.7175
+##  target     0.0394 0.209 2297  -0.3700   0.4487
 ## 
 ## Results are averaged over the levels of: side 
-## Degrees-of-freedom method: kenward-roger</code></pre>
+## Confidence level used: 0.95 
+## 
+## $contrasts
+## region = anteriofrontal:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target    2.227 0.256 2297  8.687  &lt;.0001 
+## 
+## region = central:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   -0.548 0.217 2297 -2.531  0.0114 
+## 
+## region = centroparietal:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   -1.367 0.217 2297 -6.307  &lt;.0001 
+## 
+## region = frontal:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target    1.332 0.191 2297  6.970  &lt;.0001 
+## 
+## region = frontocentral:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target    0.312 0.217 2297  1.440  0.1499 
+## 
+## region = frontotemporal:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target    1.150 0.405 2297  2.836  0.0046 
+## 
+## region = none:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target    0.381 0.573 2297  0.665  0.5062 
+## 
+## region = occipital:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   -0.799 0.331 2297 -2.415  0.0158 
+## 
+## region = parietal:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   -1.270 0.173 2297 -7.348  &lt;.0001 
+## 
+## region = parietooccipital:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target   -1.389 0.256 2297 -5.418  &lt;.0001 
+## 
+## region = prefrontal:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target    2.745 0.405 2297  6.771  &lt;.0001 
+## 
+## region = temporal:
+##  contrast         estimate    SE   df t.ratio p.value
+##  control - target    0.257 0.295 2297  0.873  0.3828 
+## 
+## Results are averaged over the levels of: side</code></pre>
 
 
 

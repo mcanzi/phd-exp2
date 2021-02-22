@@ -14,44 +14,39 @@ library(tidyverse)
 ```
 
 ```{r readr.1, message = FALSE}
-ERP <- read_csv("../data/EXP2.csv") %>%
-  filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %>%
-  filter(time >= -100 & time <= 800) %>% na.omit() %>%
+ERP <- read_csv("../data/EXP2.lmer.csv") %>%
+  filter(Cond == "target" | Cond == "control") %>%
+  mutate(Subj = as.factor(Subj)) %>%
+  # filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %>%
+  filter(time >= -100 & time <= 700) %>%
   gather(electrode, amplitude, Fp1:T8, factor_key = TRUE) %>%
   mutate(time = as.numeric(as.character(format(round(time, 0), nsmall = 0))),
-         Subj = as.factor(Subj),
          Block = as.factor(Block))
 
 names(ERP) <- c("subject", "block", "condition", "time", "electrode", "amplitude")
 ```
 
 ```{r readr.2, message = FALSE}
-ERP %<>% mutate(time = as.factor(time)) %>%
+ERP %<>% mutate(time = as.factor(time), subject = as.factor(subject)) %>%
   group_by(subject, block, condition, electrode, time) %>% 
   summarise(amplitude.mean = mean(amplitude),) %>% 
   ungroup() %>% mutate(time = as.numeric(as.character(time)), 
                        amplitude.mean = as.numeric(amplitude.mean), 
                        electrode = as.factor(electrode)) %>%
   filter(amplitude.mean <= 20 & amplitude.mean >= -20) %>%
-  mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2))) %>% droplevels()
+  mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2)))
 ```
-
-```{r}
-table(ERP$subject)
-```
-
 
 ```{r, summarised.model, message = F}
 summarised.model <- function(TP1, TP2, type = "lmer") {
   
-  lmer.data <- left_join(ERP %>% 
-    filter(condition == "control" | condition == "target") %>% 
+  lmer.data <- left_join(ERP %>%
     filter(time >= TP1) %>%
     filter(time <= TP2) %>%
     filter(block == "ATT") %>%
     group_by(subject, block, condition, electrode) %>%
-    summarise(avg.mean = mean(amplitude.mean),) %>%
-    ungroup(), read.csv("../resources/lmer_electrodes.csv", 
+    summarise(avg.mean = mean(amplitude.mean),) %>% ungroup,
+    read.csv("../resources/lmer_electrodes.csv", 
                         sep = ";"), by = "electrode")
   
   if (type == "lmer") {
@@ -67,20 +62,21 @@ summarised.model <- function(TP1, TP2, type = "lmer") {
   return(m) }
 ```
 
-```{r, message = F}
-anova(summarised.model(75, 125, type = "lmer"))
-emmeans(summarised.model(75, 125, "lmer"), pairwise ~ condition | region)
+```{r, message = T}
+anova(summarised.model(75, 125, type = "lm"))
+emmeans(summarised.model(75, 125, "lm"), pairwise ~ condition | region)
 ```
 
 ```{r, message = F}
-anova(summarised.model(150, 200, type = "lmer"))
+anova(summarised.model(150, 200, type = "lm"))
 ```
 
 ```{r, message = F}
-anova(summarised.model(290, 310, type = "lmer"))
+anova(summarised.model(280, 320, type = "lm"))
+emmeans(summarised.model(280, 320, "lm"), pairwise ~ condition | region)
 ```
 
 ```{r, message = F}
-anova(summarised.model(575, 625, type = "lmer"))
-emmeans(summarised.model(75, 125, "lmer"), pairwise ~ condition | region)
+anova(summarised.model(575, 625, type = "lm"))
+emmeans(summarised.model(574, 625, "lm"), pairwise ~ condition | region)
 ```
