@@ -14,8 +14,7 @@ library(tidyverse)
 ```
 
 ```{r readr.1, message = FALSE}
-ERP <- bind_rows(read.csv("../data/EXP2.csv"), read.csv("../data/EXP1_pt1.csv"),
-                 read.csv("../data/EXP1_pt2.csv")) %>% 
+ERP <- read_csv("../data/EXP2.csv") %>%
   filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %>%
   filter(time >= -100 & time <= 800) %>% na.omit() %>%
   gather(electrode, amplitude, Fp1:T8, factor_key = TRUE) %>%
@@ -27,16 +26,20 @@ names(ERP) <- c("subject", "block", "condition", "time", "electrode", "amplitude
 ```
 
 ```{r readr.2, message = FALSE}
-ERP %<>% filter(subject != "207") %>%
-  mutate(time = as.factor(time)) %>%
+ERP %<>% mutate(time = as.factor(time)) %>%
   group_by(subject, block, condition, electrode, time) %>% 
   summarise(amplitude.mean = mean(amplitude),) %>% 
   ungroup() %>% mutate(time = as.numeric(as.character(time)), 
                        amplitude.mean = as.numeric(amplitude.mean), 
                        electrode = as.factor(electrode)) %>%
   filter(amplitude.mean <= 20 & amplitude.mean >= -20) %>%
-  mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2)))
+  mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2))) %>% droplevels()
 ```
+
+```{r}
+table(ERP$subject)
+```
+
 
 ```{r, summarised.model, message = F}
 summarised.model <- function(TP1, TP2, type = "lmer") {
