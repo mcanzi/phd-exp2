@@ -6,6 +6,7 @@ output: html_document
 ---
 
 ```{r, message = F}
+library(car)
 library(emmeans)
 library(lme4)
 library(lmerTest)
@@ -38,45 +39,78 @@ ERP %<>% mutate(time = as.factor(time), subject = as.factor(subject)) %>%
 ```
 
 ```{r, summarised.model, message = F}
-summarised.model <- function(TP1, TP2, type = "lmer") {
+summarised.data <- function(TP1, TP2) {
   
   lmer.data <- left_join(ERP %>%
     filter(time >= TP1) %>%
     filter(time <= TP2) %>%
     filter(block == "ATT") %>%
     group_by(subject, block, condition, electrode) %>%
-    summarise(avg.mean = mean(amplitude.mean),) %>% ungroup,
+    summarise(amplitude = mean(amplitude.mean),) %>% ungroup,
     read.csv("../resources/lmer_electrodes.csv", 
-                        sep = ";"), by = "electrode")
-  
-  if (type == "lmer") {
-    
-    m <- lmer.data %>% 
-      lmer(formula = avg.mean ~ condition * region + side + (1 + condition | subject)) }
-  
-  if (type == "lm") {
-    
-    m <- lmer.data %>%
-      lm(formula = avg.mean ~ condition * region + side) }
+                        sep = ";"), by = "electrode") %>% 
+    filter(side != "none") %>% mutate_if(is.character, as.factor)
 
-  return(m) }
+  return(lmer.data) }
 ```
 
-```{r, message = T}
-anova(summarised.model(75, 125, type = "lm"))
-emmeans(summarised.model(75, 125, "lm"), pairwise ~ condition | region)
+## LMEM: 75-125 ms
+
+```{r, message = F}
+model.75.125 <- summarised.data(75, 125) %>% 
+  lmer(formula = amplitude ~ condition * region + side + (1 | subject))
 ```
 
 ```{r, message = F}
-anova(summarised.model(150, 200, type = "lm"))
+isSingular(model.75.125)
+Anova(model.75.125, type = "III")
+emmeans(model.75.125, pairwise ~ condition | region * side)
+summary(model.75.125)
+```
+
+## LMEM: 150-200 ms
+
+```{r, message = F}
+model.150.200.2 <- summarised.data(150, 200) %>% 
+  lmer(formula = amplitude ~ condition * region * side + (1 | subject))
+
+model.150.200 <- summarised.data(150, 200) %>% 
+  lmer(formula = amplitude ~ condition * region + side + (1 | subject))
+
+anova(model.150.200, model.150.200.2)
 ```
 
 ```{r, message = F}
-anova(summarised.model(280, 320, type = "lm"))
-emmeans(summarised.model(280, 320, "lm"), pairwise ~ condition | region)
+isSingular(model.150.200)
+Anova(model.150.200, type = "III")
+emmeans(model.150.200, pairwise ~ condition | region * side)
+summary(model.150.200)
 ```
 
+## LMEM: 290-310 ms
+
 ```{r, message = F}
-anova(summarised.model(575, 625, type = "lm"))
-emmeans(summarised.model(574, 625, "lm"), pairwise ~ condition | region)
+model.290.310 <- summarised.data(290, 310) %>% 
+  lmer(formula = amplitude ~ condition * region * side + (1 | subject)) 
+```
+
+```{r}
+isSingular(model.290.310)
+Anova(model.290.310, type = "III")
+emmeans(model.290.310, pairwise ~ condition | region * side)
+summary(model.290.310)
+```
+
+## LMEM: 575-625 ms
+
+```{r, message = F}
+model.575.625 <- summarised.data(575, 625) %>% 
+  lmer(formula = amplitude ~ condition * region * side + (1 | subject)) 
+```
+
+```{r}
+isSingular(model.575.625)
+Anova(model.575.625, type = "III")
+emmeans(model.575.625, pairwise ~ condition | region * side)
+summary(model.575.625)
 ```
