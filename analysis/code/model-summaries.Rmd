@@ -1,8 +1,11 @@
 ---
 title: "Experiment 2: Data modelling"
-author: "Massimiliano Canzi"
+author: "Massimiliano Canzi | `massimiliano.canzi@uni-konstanz.de`"
 date: "20/02/2021"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
 ---
 
 ```{r, message = F}
@@ -38,6 +41,8 @@ ERP %<>% mutate(time = as.factor(time), subject = as.factor(subject)) %>%
   mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2)))
 ```
 
+__N__ = _1990_
+
 ```{r, summarised.model, message = F}
 summarised.data <- function(TP1, TP2) {
   
@@ -57,15 +62,15 @@ summarised.data <- function(TP1, TP2) {
 ## LMEM: 75-125 ms
 
 ```{r, message = F}
-model.75.125 <- summarised.data(75, 125) %>% 
+model.75.100 <- summarised.data(75, 100) %>% 
   lmer(formula = amplitude ~ condition * region + side + (1 | subject))
 ```
 
 ```{r, message = F}
-isSingular(model.75.125)
-Anova(model.75.125, type = "III")
-emmeans(model.75.125, pairwise ~ condition | region * side)
-summary(model.75.125)
+isSingular(model.75.100)
+Anova(model.75.100, type = "III")
+emmeans(model.75.100, pairwise ~ condition | region * side)
+summary(model.75.100)
 ```
 
 ## LMEM: 150-200 ms
@@ -87,29 +92,55 @@ emmeans(model.150.200, pairwise ~ condition | region * side)
 summary(model.150.200)
 ```
 
-## LMEM: 290-310 ms
+## LMEM: 250-290 ms
+
+```{r}
+model.250.290 <- summarised.data(250, 290) %>% 
+  lmer(formula = amplitude ~ condition * region * side + (1 | subject))
+```
+
+```{r, message = F}
+isSingular(model.250.290)
+Anova(model.250.290, type = "III")
+emmeans(model.250.290, pairwise ~ condition | region * side)
+summary(model.250.290)
+```
+
+## LM: 290-310 ms
+
+```{r, message = F}
+model.290.310.singular <- summarised.data(290, 310) %>% 
+  lmer(formula = amplitude ~ condition * region * side + (1 | subject)) 
+
+isSingular(model.290.310.singular)
+```
 
 ```{r, message = F}
 model.290.310 <- summarised.data(290, 310) %>% 
-  lmer(formula = amplitude ~ condition * region * side + (1 | subject)) 
+  lm(formula = amplitude ~ condition * region * side) 
 ```
 
-```{r}
-isSingular(model.290.310)
+```{r, message = F}
 Anova(model.290.310, type = "III")
 emmeans(model.290.310, pairwise ~ condition | region * side)
 summary(model.290.310)
 ```
 
-## LMEM: 575-625 ms
+## LM: 575-625 ms
+
+```{r, message = F}
+model.575.625.singular <- summarised.data(575, 625) %>% 
+  lmer(formula = amplitude ~ condition * region * side + (1 | subject)) 
+
+isSingular(model.575.625.singular)
+```
 
 ```{r, message = F}
 model.575.625 <- summarised.data(575, 625) %>% 
-  lmer(formula = amplitude ~ condition * region * side + (1 | subject)) 
+  lm(formula = amplitude ~ condition * region * side) 
 ```
 
-```{r}
-isSingular(model.575.625)
+```{r, message = F}
 Anova(model.575.625, type = "III")
 emmeans(model.575.625, pairwise ~ condition | region * side)
 summary(model.575.625)
