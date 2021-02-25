@@ -11,8 +11,7 @@ output:
 ```{r, message = F}
 library(car)
 library(emmeans)
-library(lme4)
-library(lmerTest)
+library(nlme)
 library(magrittr)
 library(tidyverse)
 ```
@@ -56,102 +55,76 @@ summarised.data <- function(TP1, TP2) {
                         sep = ";"), by = "electrode") %>% 
     filter(side != "none") %>% mutate_if(is.character, as.factor)
 
-  return(lmer.data) }
+  return(data.frame(lmer.data)) }
 ```
 
 ## LMEM: 75-100 ms
 
 ```{r, message = F}
-model.75.100 <- summarised.data(75, 100) %>% 
-  lmer(formula = amplitude ~ condition * region + side + (1 | subject))
+data.model <- summarised.data(75, 100)
+
+model.75.100 <- lme(amplitude ~ condition * region + side, random = ~1 | subject,
+                     method = "REML", data = data.model)
 ```
 
 ```{r, message = F}
-isSingular(model.75.100)
 Anova(model.75.100, type = "III")
 emmeans(model.75.100, pairwise ~ condition | region)
-summary(model.75.100)
 ```
 
-## LMEM: 150-200 ms
+## LMEM: 160-210 ms
 
 ```{r, message = F}
-model.150.200.2 <- summarised.data(160, 210) %>% 
-  lmer(formula = amplitude ~ condition * region + side + (1 | subject))
+data.model <- summarised.data(160, 210)
 
-model.150.200 <- summarised.data(160, 210) %>% 
-  lmer(formula = amplitude ~ region + condition * side + (1 | subject))
-
-anova(model.150.200, model.150.200.2)
+model.160.210 <- lme(amplitude ~ condition * region + side, random = ~1 | subject,
+                     method = "REML", data = data.model)
 ```
 
 ```{r, message = F}
-isSingular(model.150.200)
-Anova(model.150.200, type = "III")
-emmeans(model.150.200, pairwise ~ condition | side)
-summary(model.150.200)
+Anova(model.160.210, type = "III")
+emmeans(model.160.210, pairwise ~ condition | side)
 ```
 
 ## LMEM: 250-290 ms
 
-```{r}
-model.250.290 <- summarised.data(240, 280) %>% 
-  lmer(formula = amplitude ~ condition * region * side + (1 | subject))
+```{r, message = F}
+data.model <- summarised.data(250, 290)
 
-model.250.290.2 <- summarised.data(240, 280) %>% 
-  lmer(formula = amplitude ~ condition * region + side + (1 | subject))
-
-anova(model.250.290, model.250.290.2)
+model.250.290 <- lme(amplitude ~ condition * region + side, random = ~1 | subject,
+                     method = "REML", data = data.model)
 ```
 
 ```{r, message = F}
-isSingular(model.250.290)
 Anova(model.250.290, type = "III")
 emmeans(model.250.290, pairwise ~ condition | region)
-summary(model.250.290)
 ```
 
 ## LM: 290-310 ms
 
 ```{r, message = F}
-model.290.310.singular <- summarised.data(290, 310) %>% 
-  lmer(formula = amplitude ~ condition * region * side + (1 | subject)) 
+data.model <- summarised.data(290, 310)
 
-isSingular(model.290.310.singular)
+model.290.310 <- lme(amplitude ~ condition * region * side, random = ~1 | subject,
+                     method = "REML", data = data.model)
 ```
 
-```{r, message = F}
-model.290.310 <- summarised.data(290, 310) %>% 
-  lm(formula = amplitude ~ condition * region * side) 
-
-model.290.310.2 <- summarised.data(290, 310) %>% 
-  lm(formula = amplitude ~ condition * region + side) 
-
-anova(model.290.310, model.290.310.2)
-```
 
 ```{r, message = F}
 Anova(model.290.310, type = "III")
 emmeans(model.290.310, pairwise ~ condition | region * side)
-summary(model.290.310)
 ```
 
 ## LM: 575-625 ms
 
 ```{r, message = F}
-model.575.625.singular <- summarised.data(575, 625) %>% 
-  lmer(formula = amplitude ~ condition * region * side + (1 | subject)) 
+data.model <- summarised.data(575, 625)
 
-isSingular(model.575.625.singular)
-```
-
-```{r, message = F}
-model.575.625 <- summarised.data(575, 625) %>% 
-  lm(formula = amplitude ~ condition * region * side) 
+model.575.625 <- lme(amplitude ~ condition * region + side, random = ~1 | subject,
+                     method = "REML", data = data.model)
 ```
 
 ```{r, message = F}
 Anova(model.575.625, type = "III")
 emmeans(model.575.625, pairwise ~ condition | region)
-summary(model.575.625)
 ```
