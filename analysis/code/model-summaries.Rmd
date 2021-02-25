@@ -59,7 +59,7 @@ summarised.data <- function(TP1, TP2) {
   return(lmer.data) }
 ```
 
-## LMEM: 75-125 ms
+## LMEM: 75-100 ms
 
 ```{r, message = F}
 model.75.100 <- summarised.data(75, 100) %>% 
@@ -69,18 +69,18 @@ model.75.100 <- summarised.data(75, 100) %>%
 ```{r, message = F}
 isSingular(model.75.100)
 Anova(model.75.100, type = "III")
-emmeans(model.75.100, pairwise ~ condition | region * side)
+emmeans(model.75.100, pairwise ~ condition | region)
 summary(model.75.100)
 ```
 
 ## LMEM: 150-200 ms
 
 ```{r, message = F}
-model.150.200.2 <- summarised.data(150, 200) %>% 
-  lmer(formula = amplitude ~ condition * region * side + (1 | subject))
-
-model.150.200 <- summarised.data(150, 200) %>% 
+model.150.200.2 <- summarised.data(160, 210) %>% 
   lmer(formula = amplitude ~ condition * region + side + (1 | subject))
+
+model.150.200 <- summarised.data(160, 210) %>% 
+  lmer(formula = amplitude ~ region + condition * side + (1 | subject))
 
 anova(model.150.200, model.150.200.2)
 ```
@@ -88,21 +88,26 @@ anova(model.150.200, model.150.200.2)
 ```{r, message = F}
 isSingular(model.150.200)
 Anova(model.150.200, type = "III")
-emmeans(model.150.200, pairwise ~ condition | region * side)
+emmeans(model.150.200, pairwise ~ condition | side)
 summary(model.150.200)
 ```
 
 ## LMEM: 250-290 ms
 
 ```{r}
-model.250.290 <- summarised.data(250, 290) %>% 
+model.250.290 <- summarised.data(240, 280) %>% 
   lmer(formula = amplitude ~ condition * region * side + (1 | subject))
+
+model.250.290.2 <- summarised.data(240, 280) %>% 
+  lmer(formula = amplitude ~ condition * region + side + (1 | subject))
+
+anova(model.250.290, model.250.290.2)
 ```
 
 ```{r, message = F}
 isSingular(model.250.290)
 Anova(model.250.290, type = "III")
-emmeans(model.250.290, pairwise ~ condition | region * side)
+emmeans(model.250.290, pairwise ~ condition | region)
 summary(model.250.290)
 ```
 
@@ -118,6 +123,11 @@ isSingular(model.290.310.singular)
 ```{r, message = F}
 model.290.310 <- summarised.data(290, 310) %>% 
   lm(formula = amplitude ~ condition * region * side) 
+
+model.290.310.2 <- summarised.data(290, 310) %>% 
+  lm(formula = amplitude ~ condition * region + side) 
+
+anova(model.290.310, model.290.310.2)
 ```
 
 ```{r, message = F}
@@ -142,6 +152,6 @@ model.575.625 <- summarised.data(575, 625) %>%
 
 ```{r, message = F}
 Anova(model.575.625, type = "III")
-emmeans(model.575.625, pairwise ~ condition | region * side)
+emmeans(model.575.625, pairwise ~ condition | region)
 summary(model.575.625)
 ```

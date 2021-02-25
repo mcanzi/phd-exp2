@@ -533,7 +533,7 @@ ggsave("./pictures/scalp_n1.png", n1, width = 9, height = 5, dpi = "print")
 pmn <- int_compare_scalps(290, 310)
 ggsave("./pictures/scalp_pmn.png", pmn, width = 9, height = 5, dpi = "print")
 
-mmn <- int_compare_scalps(150, 170)
+mmn <- int_compare_scalps(170, 190)
 ggsave("./pictures/scalp_MMN.png", mmn, width = 9, height = 5, dpi = "print")
 
 p3 <- int_compare_scalps(350, 400)
