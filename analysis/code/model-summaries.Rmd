@@ -1,27 +1,29 @@
 ---
-title: "Experiment 2: Data modelling"
+title: "__Experiment 2:__ Data modelling"
 author: "Massimiliano Canzi | `massimiliano.canzi@uni-konstanz.de`"
-date: "20/02/2021"
+date: "Last modified: _20/02/2021_"
 output: 
   html_document:
-    toc: true
-    toc_float: true
+    toc: TRUE
+    toc_float: TRUE
 ---
 
 ```{r, message = F}
-library(car)
-library(emmeans)
-library(nlme)
-library(magrittr)
-library(tidyverse)
+library(emmeans) # Pair-wise contrasts
+library(lme4) # Linear Mixed Effect Models
+library(lmerTest) # KR F-test ANOVA tables
+library(magrittr) # For %<>%
+library(tidyverse) # For everything else! 
 ```
+
+## Data pre-processing
 
 ```{r readr.1, message = FALSE}
 ERP <- read_csv("../data/EXP2.lmer.csv") %>%
   filter(Cond == "target" | Cond == "control") %>%
+  filter(Block == "ATT") %>%
   mutate(Subj = as.factor(Subj)) %>%
-  # filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %>%
-  filter(time >= -100 & time <= 700) %>%
+  filter(time >= 0 & time <= 700) %>%
   gather(electrode, amplitude, Fp1:T8, factor_key = TRUE) %>%
   mutate(time = as.numeric(as.character(format(round(time, 0), nsmall = 0))),
          Block = as.factor(Block))
@@ -40,91 +42,99 @@ ERP %<>% mutate(time = as.factor(time), subject = as.factor(subject)) %>%
   mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2)))
 ```
 
-__N__ = _1990_
+## Model preparation
 
-```{r, summarised.model, message = F}
+```{r summarised.data.function, message = F}
 summarised.data <- function(TP1, TP2) {
   
   lmer.data <- left_join(ERP %>%
     filter(time >= TP1) %>%
     filter(time <= TP2) %>%
-    filter(block == "ATT") %>%
     group_by(subject, block, condition, electrode) %>%
     summarise(amplitude = mean(amplitude.mean),) %>% ungroup,
     read.csv("../resources/lmer_electrodes.csv", 
                         sep = ";"), by = "electrode") %>% 
-    filter(side != "none") %>% mutate_if(is.character, as.factor)
+    rename(hemisphere = side) %>%
+    filter(hemisphere != "none") %>%
+    select(subject, hemisphere, region, condition, amplitude) %>%
+    group_by(subject, condition) %>%
+    mutate(subject = as.factor(paste0("S", subject))) %>%
+    mutate_if(is.character, as.factor)
+  
+  return(lmer.data) }
+```
 
-  return(data.frame(lmer.data)) }
+```{r control.REML, message = F}
+control <- lmerControl(check.conv.singular = "ignore")
+REML = TRUE
+```
+
+```{r head, message = F}
+head(summarised.data(75, 100))
 ```
 
 ## LMEM: 75-100 ms
 
-```{r, message = F}
-data.model <- summarised.data(75, 100)
-
-model.75.100 <- lme(amplitude ~ condition * region + side, random = ~1 | subject,
-                     method = "REML", data = data.model)
+```{r model.75.100, message = F}
+model.75.100 <- summarised.data(75, 100) %>% 
+  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
+       REML = TRUE, control = control)
 ```
 
-```{r, message = F}
-Anova(model.75.100, type = "III")
+```{r Anova.model.75.100, message = F}
+anova(model.75.100, type = "III", ddf = "Kenward-Roger")
 emmeans(model.75.100, pairwise ~ condition | region)
 ```
 
 ## LMEM: 160-210 ms
 
-```{r, message = F}
-data.model <- summarised.data(160, 210)
-
-model.160.210 <- lme(amplitude ~ condition * region + side, random = ~1 | subject,
-                     method = "REML", data = data.model)
+```{r model.160.210, message = F}
+model.160.210 <- summarised.data(160, 210) %>% 
+  lmer(formula = amplitude ~ condition * hemisphere + region + (1 | subject), 
+       control = control, REML = REML)
 ```
 
-```{r, message = F}
-Anova(model.160.210, type = "III")
-emmeans(model.160.210, pairwise ~ condition | side)
-```
+```{r Anova.model.160.210, message = F}
+anova(model.160.210, type = "III", ddf = "Kenward-Roger")
+emmeans(model.160.210, pairwise ~ condition | hemisphere)
+``` 
 
 ## LMEM: 250-290 ms
 
-```{r, message = F}
-data.model <- summarised.data(250, 290)
-
-model.250.290 <- lme(amplitude ~ condition * region + side, random = ~1 | subject,
-                     method = "REML", data = data.model)
+```{r model.250.290, message = F}
+model.250.290 <- summarised.data(250, 290) %>% 
+  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
+       control = control, REML = REML)
 ```
 
-```{r, message = F}
-Anova(model.250.290, type = "III")
+```{r Anova.model.250.290, message = F}
+anova(model.250.290, type = "III", ddf = "Kenward-Roger")
 emmeans(model.250.290, pairwise ~ condition | region)
 ```
 
 ## LM: 290-310 ms
 
-```{r, message = F}
-data.model <- summarised.data(290, 310)
-
-model.290.310 <- lme(amplitude ~ condition * region * side, random = ~1 | subject,
-                     method = "REML", data = data.model)
+```{r model.280.320, message = F}
+model.280.320 <- summarised.data(280, 320) %>%
+  lmer(formula = amplitude ~ condition * region + condition * hemisphere + 
+         (1 | subject), 
+       control = control, REML = REML)
 ```
 
-
-```{r, message = F}
-Anova(model.290.310, type = "III")
-emmeans(model.290.310, pairwise ~ condition | region * side)
+```{r Anova.model.280.320, message = F}
+anova(model.280.320, type = "III", ddf = "Kenward-Roger")
+emmeans(model.280.320, pairwise ~ condition | region)
 ```
 
 ## LM: 575-625 ms
 
-```{r, message = F}
-data.model <- summarised.data(575, 625)
-
-model.575.625 <- lme(amplitude ~ condition * region + side, random = ~1 | subject,
-                     method = "REML", data = data.model)
+```{r model.575.625, message = F}
+model.575.625 <- summarised.data(575, 625) %>%
+  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
+       control = control, REML = REML)
 ```
 
-```{r, message = F}
-Anova(model.575.625, type = "III")
+```{r Anova.model.575.625, message = F}
+anova(model.575.625, type = "III", ddf = "Kenward-Roger")
 emmeans(model.575.625, pairwise ~ condition | region)
 ```
