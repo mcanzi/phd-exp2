@@ -20,7 +20,6 @@ library(tidyverse) # For everything else!
 
 ```{r readr.1, message = FALSE}
 ERP <- read_csv("../data/EXP2.lmer.csv") %>%
-  filter(Cond == "target" | Cond == "control") %>%
   filter(Block == "ATT") %>%
   mutate(Subj = as.factor(Subj)) %>%
   filter(time >= 0 & time <= 700) %>%
@@ -45,13 +44,19 @@ ERP %<>% mutate(time = as.factor(time), subject = as.factor(subject)) %>%
 ## Model preparation
 
 ```{r summarised.data.function, message = F}
-summarised.data <- function(TP1, TP2) {
+summarised.data <- function(TP1, TP2, type = "main") {
+
+  if (type == "main") { 
+    lmer <- ERP %>% filter(condition == "control" | condition == "target") }
+  if (type == "syllable") {
+    lmer <- ERP %>% filter(condition != "control" & condition != "target") %>%
+      mutate(condition = as.factor(condition))}
   
-  lmer.data <- left_join(ERP %>%
+  lmer.data <- left_join(lmer %>%
     filter(time >= TP1) %>%
     filter(time <= TP2) %>%
-    group_by(subject, block, condition, electrode) %>%
-    summarise(amplitude = mean(amplitude.mean),) %>% ungroup,
+      group_by(subject, block, condition, electrode) %>%
+      summarise(amplitude = mean(amplitude.mean),) %>% ungroup,
     read.csv("../resources/lmer_electrodes.csv", 
                         sep = ";"), by = "electrode") %>% 
     rename(hemisphere = side) %>%
@@ -70,7 +75,7 @@ REML = TRUE
 ```
 
 ```{r head, message = F}
-head(summarised.data(75, 100))
+head(summarised.data(75, 100, type = "syllable"))
 ```
 
 ## LMEM: 75-100 ms
@@ -138,3 +143,17 @@ model.575.625 <- summarised.data(575, 625) %>%
 anova(model.575.625, type = "III", ddf = "Kenward-Roger")
 emmeans(model.575.625, pairwise ~ condition | region)
 ```
+
+## Syllable LMEM: 75-100
+
+```{r model.75.100, message = F}
+model.75.100 <- summarised.data(75, 100, type = "syllable") %>% 
+  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
+       REML = TRUE, control = control)
+```
+
+```{r Anova.model.75.100, message = F}
+anova(model.75.100, type = "III", ddf = "Kenward-Roger")
+emmeans(model.75.100, pairwise ~ condition | region)
+```
+
