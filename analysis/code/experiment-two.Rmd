@@ -1,12 +1,14 @@
 ---
-title: "PhD: Experiment __2__"
+title: "__Experiment 2:__ Data exploration"
 author: "Massimiliano Canzi | `massimiliano.canzi@uni-konstanz.de"
 date: "27/03/2019; Last modified 15/02/2021"
 output:
-  html_document: default
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
 ---
 
-```{r, include = F}
+```{r, message = F}
 library(ggpubr)
 library(devtools)
 library(tidyverse)
@@ -28,6 +30,8 @@ sign_col <- "indianred"
 ERP_CTB = c("skyblue4", "palegreen3")
 ERP_TTB = c("palevioletred1", "palegreen3")
 ```
+
+## `readr`
 
 ```{r readr.1, message = FALSE}
 ERP <- rbind(read.csv("../data/EXP2.csv"), read.csv("../data/EXP1_pt1.csv"),
@@ -99,6 +103,8 @@ ERP_EXP12 <- filter(ERP_testing, block == "ATT" | block == "PRS") %>%
   filter(condition == "target")
 ```
 
+## plotting function: `significance`
+
 ```{r significance}
 significance <- function(t = "CT", elec = "", amplitude.mean= "amplitude.mean") {
   
@@ -140,6 +146,8 @@ significance <- function(t = "CT", elec = "", amplitude.mean= "amplitude.mean") 
   
   return(fabh$significant) }
 ```
+
+## plotting function: `plot.diff`
 
 ```{r plot.diff.function, message = F, warning = F}
 plot.diff <- function(elec = "Cz", labels = FALSE) {
@@ -191,6 +199,15 @@ ERP.diff <- ERP %>% filter(condition == "control" & block == "ATT") %>%
   return(my.plot) }
 ```
 
+```{r}
+library(gganimate)
+library(gifski)
+```
+
+```{r, message = F, warning = F}
+plot.diff() + transition_reveal(time)
+```
+
 ```{r, include = F, eval = F}
 af.diff <- ggarrange(
   plot.diff(elec = "Fp1", labels = TRUE),
@@ -222,6 +239,8 @@ fc.diff <- ggarrange(
 
 ggsave("../figures/FCDIFF_Exp2.png", fc.diff, width = 9, height = 7, dpi = "print")
 ```
+
+## plotting function: `bae`
 
 ```{r bae.function, message = F}
 bae <- function(elec = "Cz", type = "CT", labels = FALSE, significant = TRUE) {
@@ -272,7 +291,8 @@ bae <- function(elec = "Cz", type = "CT", labels = FALSE, significant = TRUE) {
   
   if (labels == TRUE) {
     gap <- gap +
-      labs(x = "Time (ms)", y = expression(paste("Amplitude (", mu, "V)", colour = ""))) +
+      labs(x = "Time (ms)", 
+           y = expression(paste("Amplitude (", mu, "V)", colour = ""))) +
       theme_minimal() }
     
   if (labels == FALSE) {
@@ -290,6 +310,11 @@ bae <- function(elec = "Cz", type = "CT", labels = FALSE, significant = TRUE) {
       color = sign_col) } }
   
   return(gap) }
+```
+
+```{r, message = F, warning = F}
+bae(elec = "F3", significant = FALSE, labels = TRUE) +
+  transition_reveal(time)
 ```
 
 ```{r, eval = F, include = F}
@@ -449,6 +474,8 @@ exp12fronto_central <- ggarrange(
 ggsave("../figures/P14_Exp2.png", exp12fronto_central, width = 9, height = 7, dpi = "print")
 ```
 
+## functions `theme_topo` and `circleFun` by __craddm__
+
 ```{r theme.topo, message = F}
 theme_topo <- function(base_size = 12)
   {theme_bw(base_size = base_size) %+replace% theme(rect = element_blank(), line = element_blank(), axis.text = element_blank(), axis.title = element_blank())}
@@ -463,6 +490,8 @@ circleFun <- function(center = c(0,0), diameter = 1, npoints = 100) {
 headShape <- circleFun(c(0, 0), round(max(electrodeLocs$x)), npoints = 100) 
 nose <- data.frame(x = c(-0.075, 0, .075), y=c(.495, .575, .495))
 ```
+
+## plotting function: `int_scalp_plot`
 
 ```{r compare.scalps.2, message = F}
 int_scalp_plot <- function(TP1, TP2, cond = "control") {
@@ -524,6 +553,14 @@ final_plot <- ggarrange(
   common.legend = TRUE)
 
 return(final_plot) }
+```
+
+```{r, message = F, warning = F, fig.show = "hide"}
+x <- int_compare_scalps(650, 658)
+```
+
+```{r, echo = F}
+x
 ```
 
 ```{r, eval = F, include = F}
