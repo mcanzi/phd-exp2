@@ -255,7 +255,6 @@ library(tidyverse) # For everything else! </code></pre>
 <div id="data-pre-processing" class="section level2">
 <h2>Data pre-processing</h2>
 <pre class="r"><code>ERP &lt;- read_csv(&quot;../data/EXP2.lmer.csv&quot;) %&gt;%
-  filter(Cond == &quot;target&quot; | Cond == &quot;control&quot;) %&gt;%
   filter(Block == &quot;ATT&quot;) %&gt;%
   mutate(Subj = as.factor(Subj)) %&gt;%
   filter(time &gt;= 0 &amp; time &lt;= 700) %&gt;%
@@ -275,13 +274,19 @@ names(ERP) &lt;- c(&quot;subject&quot;, &quot;block&quot;, &quot;condition&quot;
 </div>
 <div id="model-preparation" class="section level2">
 <h2>Model preparation</h2>
-<pre class="r"><code>summarised.data &lt;- function(TP1, TP2) {
+<pre class="r"><code>summarised.data &lt;- function(TP1, TP2, type = &quot;main&quot;) {
+
+  if (type == &quot;main&quot;) { 
+    lmer &lt;- ERP %&gt;% filter(condition == &quot;control&quot; | condition == &quot;target&quot;) }
+  if (type == &quot;syllable&quot;) {
+    lmer &lt;- ERP %&gt;% filter(condition != &quot;control&quot; &amp; condition != &quot;target&quot;) %&gt;%
+      mutate(condition = as.factor(condition))}
   
-  lmer.data &lt;- left_join(ERP %&gt;%
+  lmer.data &lt;- left_join(lmer %&gt;%
     filter(time &gt;= TP1) %&gt;%
     filter(time &lt;= TP2) %&gt;%
-    group_by(subject, block, condition, electrode) %&gt;%
-    summarise(amplitude = mean(amplitude.mean),) %&gt;% ungroup,
+      group_by(subject, block, condition, electrode) %&gt;%
+      summarise(amplitude = mean(amplitude.mean),) %&gt;% ungroup,
     read.csv(&quot;../resources/lmer_electrodes.csv&quot;, 
                         sep = &quot;;&quot;), by = &quot;electrode&quot;) %&gt;% 
     rename(hemisphere = side) %&gt;%
@@ -294,17 +299,17 @@ names(ERP) &lt;- c(&quot;subject&quot;, &quot;block&quot;, &quot;condition&quot;
   return(lmer.data) }</code></pre>
 <pre class="r"><code>control &lt;- lmerControl(check.conv.singular = &quot;ignore&quot;)
 REML = TRUE</code></pre>
-<pre class="r"><code>head(summarised.data(75, 100))</code></pre>
+<pre class="r"><code>head(summarised.data(75, 100, type = &quot;syllable&quot;))</code></pre>
 <pre><code>## # A tibble: 6 x 5
 ## # Groups:   subject, condition [1]
-##   subject hemisphere region         condition amplitude
-##   &lt;fct&gt;   &lt;fct&gt;      &lt;fct&gt;          &lt;chr&gt;         &lt;dbl&gt;
-## 1 S201    left       prefrontal     control       0.582
-## 2 S201    left       anteriofrontal control       0.637
-## 3 S201    left       anteriofrontal control       0.272
-## 4 S201    left       frontal        control       0.422
-## 5 S201    left       frontal        control       0.542
-## 6 S201    left       frontal        control       0.718</code></pre>
+##   subject hemisphere region         condition      amplitude
+##   &lt;fct&gt;   &lt;fct&gt;      &lt;fct&gt;          &lt;fct&gt;              &lt;dbl&gt;
+## 1 S202    left       prefrontal     first_syllable   -0.162 
+## 2 S202    left       anteriofrontal first_syllable   -0.0462
+## 3 S202    left       anteriofrontal first_syllable    0.238 
+## 4 S202    left       frontal        first_syllable    0.654 
+## 5 S202    left       frontal        first_syllable    0.508 
+## 6 S202    left       frontal        first_syllable    0.0438</code></pre>
 </div>
 <div id="lmem-75-100-ms" class="section level2">
 <h2>LMEM: 75-100 ms</h2>
@@ -594,78 +599,78 @@ REML = TRUE</code></pre>
 ## Results are averaged over the levels of: hemisphere 
 ## Degrees-of-freedom method: kenward-roger</code></pre>
 </div>
-<div id="lm-290-310-ms" class="section level2">
-<h2>LM: 290-310 ms</h2>
+<div id="lm-280-320-ms" class="section level2">
+<h2>LM: 280-320 ms</h2>
 <pre class="r"><code>model.280.320 &lt;- summarised.data(280, 320) %&gt;%
-  lmer(formula = amplitude ~ condition * region + condition * hemisphere + 
+  lmer(formula = amplitude ~ condition * region + region * hemisphere + 
          (1 | subject), 
        control = control, REML = REML)</code></pre>
 <pre class="r"><code>anova(model.280.320, type = &quot;III&quot;, ddf = &quot;Kenward-Roger&quot;)</code></pre>
 <pre><code>## Type III Analysis of Variance Table with Kenward-Roger&#39;s method
-##                       Sum Sq Mean Sq NumDF  DenDF F value    Pr(&gt;F)    
-## condition               0.00   0.001     1 1965.6  0.0005  0.981553    
-## region               1436.43 143.643    10 1948.9 93.1370 &lt; 2.2e-16 ***
-## hemisphere            141.88 141.879     1 1948.2 91.9931 &lt; 2.2e-16 ***
-## condition:region       44.87   4.487    10 1948.2  2.9091  0.001277 ** 
-## condition:hemisphere    1.24   1.237     1 1948.2  0.8019  0.370625    
+##                    Sum Sq Mean Sq NumDF  DenDF F value    Pr(&gt;F)    
+## condition            0.00   0.001     1 1956.6  0.0005  0.981420    
+## region            1436.43 143.643    10 1939.9 94.4885 &lt; 2.2e-16 ***
+## hemisphere         114.54 114.543     1 1939.2 75.3469 &lt; 2.2e-16 ***
+## condition:region    44.87   4.487    10 1939.2  2.9513  0.001093 ** 
+## region:hemisphere   58.29   5.829    10 1939.2  3.8342 3.726e-05 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <pre class="r"><code>emmeans(model.280.320, pairwise ~ condition | region)</code></pre>
 <pre><code>## $emmeans
 ## region = anteriofrontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -1.8643 0.1464 1800  -2.1514   -1.577
-##  target    -1.7349 0.1425 1800  -2.0143   -1.455
+##  control   -1.8643 0.1453 1793  -2.1494  -1.5793
+##  target    -1.7349 0.1414 1793  -2.0122  -1.4575
 ## 
 ## region = central:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.7587 0.1195 1569   0.5243    0.993
-##  target     0.7205 0.1163 1569   0.4924    0.949
+##  control    0.7587 0.1187 1564   0.5260   0.9915
+##  target     0.7205 0.1155 1564   0.4940   0.9470
 ## 
 ## region = centroparietal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.9665 0.1195 1569   0.7320    1.201
-##  target     0.6825 0.1163 1569   0.4544    0.911
+##  control    0.9665 0.1187 1564   0.7337   1.1992
+##  target     0.6825 0.1155 1564   0.4560   0.9090
 ## 
 ## region = frontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.8409 0.1035 1317  -1.0439   -0.638
-##  target    -0.5669 0.1007 1317  -0.7645   -0.369
+##  control   -0.8409 0.1028 1313  -1.0425  -0.6392
+##  target    -0.5669 0.1000 1313  -0.7631  -0.3707
 ## 
 ## region = frontocentral:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.3184 0.1195 1569   0.0839    0.553
-##  target     0.4601 0.1163 1569   0.2320    0.688
+##  control    0.3184 0.1187 1564   0.0856   0.5511
+##  target     0.4601 0.1155 1564   0.2336   0.6866
 ## 
 ## region = frontotemporal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.8627 0.2070 1945  -1.2687   -0.457
-##  target    -0.2961 0.2015 1945  -0.6912    0.099
+##  control   -0.8627 0.2055 1936  -1.2657  -0.4597
+##  target    -0.2961 0.2000 1936  -0.6884   0.0961
 ## 
 ## region = occipital:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.1660 0.2070 1945  -0.5720    0.240
-##  target    -0.5622 0.2015 1945  -0.9573   -0.167
+##  control   -0.1660 0.2055 1936  -0.5691   0.2370
+##  target    -0.5622 0.2000 1936  -0.9545  -0.1699
 ## 
 ## region = parietal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.4689 0.0926 1084   0.2873    0.651
-##  target     0.2185 0.0901 1084   0.0417    0.395
+##  control    0.4689 0.0919 1082   0.2886   0.6493
+##  target     0.2185 0.0894 1082   0.0429   0.3940
 ## 
 ## region = parietooccipital:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control    0.5194 0.1464 1800   0.2323    0.806
-##  target    -0.0424 0.1425 1800  -0.3218    0.237
+##  control    0.5194 0.1453 1793   0.2344   0.8044
+##  target    -0.0424 0.1414 1793  -0.3198   0.2350
 ## 
 ## region = prefrontal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -2.3693 0.2070 1945  -2.7753   -1.963
-##  target    -2.4119 0.2015 1945  -2.8070   -2.017
+##  control   -2.3693 0.2055 1936  -2.7724  -1.9663
+##  target    -2.4119 0.2000 1936  -2.8042  -2.0197
 ## 
 ## region = temporal:
 ##  condition  emmean     SE   df lower.CL upper.CL
-##  control   -0.4725 0.1506 1812  -0.7680   -0.177
-##  target    -0.0274 0.1464 1811  -0.3145    0.260
+##  control   -0.4725 0.1496 1805  -0.7658  -0.1792
+##  target    -0.0274 0.1453 1804  -0.3124   0.2576
 ## 
 ## Results are averaged over the levels of: hemisphere 
 ## Degrees-of-freedom method: kenward-roger 
@@ -674,47 +679,47 @@ REML = TRUE</code></pre>
 ## $contrasts
 ## region = anteriofrontal:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target  -0.1295 0.204 1952 -0.634  0.5262 
+##  control - target  -0.1295 0.203 1943 -0.639  0.5232 
 ## 
 ## region = central:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target   0.0382 0.167 1954  0.229  0.8186 
+##  control - target   0.0382 0.166 1945  0.231  0.8173 
 ## 
 ## region = centroparietal:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target   0.2840 0.167 1954  1.703  0.0888 
+##  control - target   0.2840 0.166 1945  1.715  0.0865 
 ## 
 ## region = frontal:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target  -0.2740 0.144 1955 -1.897  0.0580 
+##  control - target  -0.2740 0.143 1946 -1.911  0.0562 
 ## 
 ## region = frontocentral:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target  -0.1418 0.167 1954 -0.850  0.3954 
+##  control - target  -0.1418 0.166 1945 -0.856  0.3920 
 ## 
 ## region = frontotemporal:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target  -0.5666 0.289 1950 -1.961  0.0500 
+##  control - target  -0.5666 0.287 1941 -1.976  0.0483 
 ## 
 ## region = occipital:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target   0.3962 0.289 1950  1.372  0.1703 
+##  control - target   0.3962 0.287 1941  1.382  0.1673 
 ## 
 ## region = parietal:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target   0.2505 0.129 1957  1.939  0.0527 
+##  control - target   0.2505 0.128 1948  1.953  0.0510 
 ## 
 ## region = parietooccipital:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target   0.5618 0.204 1952  2.751  0.0060 
+##  control - target   0.5618 0.203 1943  2.771  0.0057 
 ## 
 ## region = prefrontal:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target   0.0426 0.289 1950  0.147  0.8828 
+##  control - target   0.0426 0.287 1941  0.149  0.8819 
 ## 
 ## region = temporal:
 ##  contrast         estimate    SE   df t.ratio p.value
-##  control - target  -0.4451 0.210 1952 -2.120  0.0342 
+##  control - target  -0.4451 0.209 1943 -2.135  0.0329 
 ## 
 ## Results are averaged over the levels of: hemisphere 
 ## Degrees-of-freedom method: kenward-roger</code></pre>
@@ -841,6 +846,163 @@ REML = TRUE</code></pre>
 ## 
 ## Results are averaged over the levels of: hemisphere 
 ## Degrees-of-freedom method: kenward-roger</code></pre>
+</div>
+<div id="syllable-lmem-75-100" class="section level2">
+<h2>Syllable LMEM: 75-100</h2>
+<pre class="r"><code>model.75.100 &lt;- summarised.data(75, 100, type = &quot;syllable&quot;) %&gt;% 
+  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
+       REML = TRUE, control = control)</code></pre>
+<pre class="r"><code>anova(model.75.100, type = &quot;III&quot;, ddf = &quot;Kenward-Roger&quot;)</code></pre>
+<pre><code>## Type III Analysis of Variance Table with Kenward-Roger&#39;s method
+##                  Sum Sq Mean Sq NumDF  DenDF F value  Pr(&gt;F)    
+## condition         0.080  0.0398     2 2169.5  0.1550 0.85640    
+## region           58.388  5.8388    10 2161.3 22.7479 &lt; 2e-16 ***
+## hemisphere        0.704  0.7039     1 2161.0  2.7424 0.09786 .  
+## condition:region 11.124  0.5562    20 2161.0  2.1670 0.00199 ** 
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<pre class="r"><code>emmeans(model.75.100, pairwise ~ condition | region)</code></pre>
+<pre><code>## $emmeans
+## region = anteriofrontal:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable  -0.12699 0.0685 1669 -0.26137  0.00739
+##  second_syllable -0.04200 0.0711 1708 -0.18143  0.09742
+##  third_syllable  -0.24003 0.0685 1669 -0.37441 -0.10565
+## 
+## region = central:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable   0.22184 0.0563 1259  0.11145  0.33223
+##  second_syllable  0.12289 0.0584 1311  0.00837  0.23742
+##  third_syllable   0.11349 0.0563 1259  0.00310  0.22388
+## 
+## region = centroparietal:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable   0.03908 0.0563 1259 -0.07131  0.14946
+##  second_syllable -0.01926 0.0584 1311 -0.13378  0.09527
+##  third_syllable   0.05031 0.0563 1259 -0.06008  0.16070
+## 
+## region = frontal:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable   0.21685 0.0490  937  0.12067  0.31304
+##  second_syllable  0.18173 0.0508  989  0.08196  0.28151
+##  third_syllable   0.05628 0.0490  937 -0.03990  0.15247
+## 
+## region = frontocentral:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable   0.36109 0.0563 1259  0.25070  0.47148
+##  second_syllable  0.27295 0.0584 1311  0.15843  0.38748
+##  third_syllable   0.22906 0.0563 1259  0.11867  0.33945
+## 
+## region = frontotemporal:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable   0.04041 0.0963 2056 -0.14848  0.22931
+##  second_syllable  0.00511 0.0999 2069 -0.19089  0.20112
+##  third_syllable   0.15657 0.0963 2056 -0.03233  0.34546
+## 
+## region = occipital:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable  -0.43456 0.0963 2056 -0.62345 -0.24567
+##  second_syllable -0.22924 0.0999 2069 -0.42524 -0.03323
+##  third_syllable  -0.11107 0.0963 2056 -0.29996  0.07782
+## 
+## region = parietal:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable  -0.10750 0.0441  709 -0.19406 -0.02094
+##  second_syllable -0.11301 0.0457  754 -0.20279 -0.02323
+##  third_syllable  -0.00339 0.0441  709 -0.08995  0.08317
+## 
+## region = parietooccipital:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable  -0.28195 0.0685 1669 -0.41633 -0.14757
+##  second_syllable -0.18348 0.0711 1708 -0.32291 -0.04406
+##  third_syllable  -0.09462 0.0685 1669 -0.22899  0.03976
+## 
+## region = prefrontal:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable  -0.33701 0.0963 2056 -0.52590 -0.14811
+##  second_syllable -0.12169 0.0999 2069 -0.31770  0.07432
+##  third_syllable  -0.48332 0.0963 2056 -0.67222 -0.29443
+## 
+## region = temporal:
+##  condition         emmean     SE   df lower.CL upper.CL
+##  first_syllable  -0.02049 0.0697 1696 -0.15729  0.11632
+##  second_syllable -0.15585 0.0725 1736 -0.29800 -0.01371
+##  third_syllable   0.06803 0.0697 1696 -0.06877  0.20483
+## 
+## Results are averaged over the levels of: hemisphere 
+## Degrees-of-freedom method: kenward-roger 
+## Confidence level used: 0.95 
+## 
+## $contrasts
+## region = anteriofrontal:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable -0.08499 0.0976 2164 -0.871  0.6588 
+##  first_syllable - third_syllable   0.11304 0.0957 2161  1.181  0.4649 
+##  second_syllable - third_syllable  0.19803 0.0976 2164  2.029  0.1056 
+## 
+## region = central:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable  0.09895 0.0797 2165  1.241  0.4289 
+##  first_syllable - third_syllable   0.10835 0.0782 2161  1.386  0.3484 
+##  second_syllable - third_syllable  0.00941 0.0797 2165  0.118  0.9924 
+## 
+## region = centroparietal:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable  0.05833 0.0797 2165  0.732  0.7446 
+##  first_syllable - third_syllable  -0.01124 0.0782 2161 -0.144  0.9887 
+##  second_syllable - third_syllable -0.06957 0.0797 2165 -0.873  0.6576 
+## 
+## region = frontal:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable  0.03512 0.0690 2166  0.509  0.8671 
+##  first_syllable - third_syllable   0.16057 0.0677 2161  2.372  0.0468 
+##  second_syllable - third_syllable  0.12545 0.0690 2166  1.817  0.1642 
+## 
+## region = frontocentral:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable  0.08814 0.0797 2165  1.106  0.5106 
+##  first_syllable - third_syllable   0.13203 0.0782 2161  1.689  0.2096 
+##  second_syllable - third_syllable  0.04390 0.0797 2165  0.551  0.8461 
+## 
+## region = frontotemporal:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable  0.03530 0.1380 2162  0.256  0.9646 
+##  first_syllable - third_syllable  -0.11615 0.1354 2161 -0.858  0.6670 
+##  second_syllable - third_syllable -0.15145 0.1380 2162 -1.097  0.5158 
+## 
+## region = occipital:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable -0.20533 0.1380 2162 -1.488  0.2970 
+##  first_syllable - third_syllable  -0.32349 0.1354 2161 -2.389  0.0447 
+##  second_syllable - third_syllable -0.11816 0.1380 2162 -0.856  0.6680 
+## 
+## region = parietal:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable  0.00551 0.0618 2167  0.089  0.9956 
+##  first_syllable - third_syllable  -0.10411 0.0606 2161 -1.719  0.1982 
+##  second_syllable - third_syllable -0.10962 0.0618 2167 -1.775  0.1783 
+## 
+## region = parietooccipital:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable -0.09847 0.0976 2164 -1.009  0.5713 
+##  first_syllable - third_syllable  -0.18734 0.0957 2161 -1.957  0.1234 
+##  second_syllable - third_syllable -0.08887 0.0976 2164 -0.910  0.6337 
+## 
+## region = prefrontal:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable -0.21531 0.1380 2162 -1.560  0.2633 
+##  first_syllable - third_syllable   0.14632 0.1354 2161  1.081  0.5262 
+##  second_syllable - third_syllable  0.36163 0.1380 2162  2.620  0.0240 
+## 
+## region = temporal:
+##  contrast                         estimate     SE   df t.ratio p.value
+##  first_syllable - second_syllable  0.13537 0.0995 2164  1.361  0.3618 
+##  first_syllable - third_syllable  -0.08852 0.0975 2161 -0.908  0.6354 
+##  second_syllable - third_syllable -0.22389 0.0995 2164 -2.251  0.0632 
+## 
+## Results are averaged over the levels of: hemisphere 
+## Degrees-of-freedom method: kenward-roger 
+## P value adjustment: tukey method for comparing a family of 3 estimates</code></pre>
 </div>
 
 

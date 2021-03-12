@@ -86,7 +86,7 @@ model.75.100 <- summarised.data(75, 100) %>%
        REML = TRUE, control = control)
 ```
 
-```{r Anova.model.75.100, message = F}
+```{r Anova.model.7.100, message = F}
 anova(model.75.100, type = "III", ddf = "Kenward-Roger")
 emmeans(model.75.100, pairwise ~ condition | region)
 ```
@@ -117,11 +117,11 @@ anova(model.250.290, type = "III", ddf = "Kenward-Roger")
 emmeans(model.250.290, pairwise ~ condition | region)
 ```
 
-## LM: 290-310 ms
+## LM: 280-320 ms
 
 ```{r model.280.320, message = F}
 model.280.320 <- summarised.data(280, 320) %>%
-  lmer(formula = amplitude ~ condition * region + condition * hemisphere + 
+  lmer(formula = amplitude ~ condition * region + region * hemisphere + 
          (1 | subject), 
        control = control, REML = REML)
 ```
@@ -146,13 +146,13 @@ emmeans(model.575.625, pairwise ~ condition | region)
 
 ## Syllable LMEM: 75-100
 
-```{r model.75.100, message = F}
+```{r model.75.100.S, message = F}
 model.75.100 <- summarised.data(75, 100, type = "syllable") %>% 
   lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
        REML = TRUE, control = control)
 ```
 
-```{r Anova.model.75.100, message = F}
+```{r Anova.model.75.100.S, message = F}
 anova(model.75.100, type = "III", ddf = "Kenward-Roger")
 emmeans(model.75.100, pairwise ~ condition | region)
 ```
