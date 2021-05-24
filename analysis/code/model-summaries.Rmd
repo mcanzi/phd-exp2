@@ -117,7 +117,7 @@ anova(model.250.290, type = "III", ddf = "Kenward-Roger")
 emmeans(model.250.290, pairwise ~ condition | region)
 ```
 
-## LM: 280-320 ms
+## LMEM: 280-320 ms
 
 ```{r model.280.320, message = F}
 model.280.320 <- summarised.data(280, 320) %>%
