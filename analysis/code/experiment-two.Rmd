@@ -533,7 +533,8 @@ int_scalp_plot <- function(TP1, TP2, cond = "control") {
     geom_raster() +
     stat_contour(aes(z = Amplitude, linetype = ..level..<0), colour = "black", size = 0.8, show.legend = FALSE) +
     theme_topo() +
-    scale_fill_viridis(option = "viridis", limits = c(-2, 2), guide = "colorbar", oob = squish) +
+    scale_fill_viridis(option = "turbo", limits = c(-3, 3), guide = "colorbar", oob = squish, 
+                       name = expression(paste("Amplitude (", mu, "V)"))) +
     geom_path(data = maskRing, aes(x, y, z = NULL, fill =NULL), colour = "white", size = 6) +
     geom_point(data = singleTimepoint, aes(x, y), size = 1) +
     geom_path(data = headShape, aes(x, y, z = NULL, fill = NULL), size = 1.5) +
@@ -547,12 +548,75 @@ int_compare_scalps <- function(tp1, tp2) {
   control_map <- int_scalp_plot(TP1 = tp1, TP2 = tp2, cond = "control") 
   target_map <- int_scalp_plot(TP1 = tp1, TP2 = tp2, cond = "target")
 
-final_plot <- ggarrange(
-  target_map + ggtitle("Mismatch"),
-  control_map + ggtitle("Match"),
-  common.legend = TRUE)
+  if (tp1 <= 9 && tp2 <= 9) {
+    final_plot <- annotate_figure(ggarrange(
+    target_map + ggtitle("Mismatch"),
+    control_map + ggtitle("Match"),
+    common.legend = TRUE), 
+    top = text_grob(paste0("Mean amplitude (00", tp1, "-00", tp2, " ms) cubic-spline interpolation scalp map"),
+                    face = "bold")) }
+  else if (tp1 <= 9 && tp2 > 9) {
+    final_plot <- annotate_figure(ggarrange(
+    target_map + ggtitle("Mismatch"),
+    control_map + ggtitle("Match"),
+    common.legend = TRUE), 
+    top = text_grob(paste0("Mean amplitude (00", tp1, "-0", tp2, " ms) cubic-spline interpolation scalp map"),
+                    face = "bold")) }
+  else if (tp1 > 9 & tp1 <= 99 && tp2 > 9 && tp2 <= 99) {
+    final_plot <- annotate_figure(ggarrange(
+    target_map + ggtitle("Mismatch"),
+    control_map + ggtitle("Match"),
+    common.legend = TRUE), 
+    top = text_grob(paste0("Mean amplitude (0", tp1, "-0", tp2, " ms) cubic-spline interpolation scalp map"),
+                    face = "bold")) }
+    else if (tp1 > 9 & tp1 <= 99 && tp2 > 99) {
+    final_plot <- annotate_figure(ggarrange(
+    target_map + ggtitle("Mismatch"),
+    control_map + ggtitle("Match"),
+    common.legend = TRUE), 
+    top = text_grob(paste0("Mean amplitude (0", tp1, "-", tp2, " ms) cubic-spline interpolation scalp map"),
+                    face = "bold")) }
+  else if (tp1 > 99 && tp2 > 99) {
+    final_plot <- annotate_figure(ggarrange(
+    target_map + ggtitle("Mismatch"),
+    control_map + ggtitle("Match"),
+    common.legend = TRUE), 
+    top = text_grob(paste0("Mean amplitude (", tp1, "-", tp2, " ms) cubic-spline interpolation scalp map"),
+                    face = "bold")) }
 
 return(final_plot) }
+```
+
+```{r, message = F, include = F}
+T1 <- 0
+T2 <- 4
+
+for (i in 1:140) {
+  z <- int_compare_scalps(T1, T2)
+  ggsave(paste0("gif/frame", i+100, ".png"), z, dpi = "print")
+  T1 <- T1 + 5
+  T2 <- T2 + 5
+}
+
+library(gifski)
+png_files <- list.files("gif/", pattern = ".*png$", full.names = TRUE)
+gifski(png_files, gif_file = "turbo.gif", width = 800, height = 500, delay = 0.04)
+```
+
+```{r, include = F, message = F}
+T1 <- 0
+T2 <- 4
+
+for (i in 1:140) {
+  z <- int_compare_scalps(T1, T2)
+  ggsave(paste0("gif2/frame", i+100, ".png"), z, dpi = "print")
+  T1 <- T1 + 5
+  T2 <- T2 + 5
+}
+
+library(gifski)
+png_files <- list.files("gif2/", pattern = ".*png$", full.names = TRUE)
+gifski(png_files, gif_file = "rocket.gif", width = 800, height = 500, delay = 0.04)
 ```
 
 ```{r, message = F, warning = F, fig.show = "hide"}
@@ -565,6 +629,7 @@ x
 
 ```{r, eval = F, include = F}
 n1 <- int_compare_scalps(90, 110)
+n1
 ggsave("./pictures/scalp_n1.png", n1, width = 9, height = 5, dpi = "print")
 
 pmn <- int_compare_scalps(290, 310)
