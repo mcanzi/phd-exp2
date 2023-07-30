@@ -10,10 +10,13 @@ output:
 
 ```{r, message = F}
 library(emmeans) # Pair-wise contrasts
+library(itsadug)
+library(mgcv)
 library(lme4) # Linear Mixed Effect Models
 library(lmerTest) # KR F-test ANOVA tables
 library(magrittr) # For %<>%
 library(tidyverse) # For everything else! 
+library(tidymv)
 ```
 
 ## Data pre-processing
@@ -22,13 +25,86 @@ library(tidyverse) # For everything else!
 ERP <- read_csv("../data/EXP2.lmer.csv") %>%
   filter(Block == "ATT") %>%
   mutate(Subj = as.factor(Subj)) %>%
-  filter(time >= 0 & time <= 700) %>%
+  filter(time >= 0 & time <= 400) %>%
   gather(electrode, amplitude, Fp1:T8, factor_key = TRUE) %>%
   mutate(time = as.numeric(as.character(format(round(time, 0), nsmall = 0))),
          Block = as.factor(Block))
 
 names(ERP) <- c("subject", "block", "condition", "time", "electrode", "amplitude")
 ```
+
+## GAMMs
+
+### Frontral
+
+```{r}
+F.gamms <- ERP %>% 
+  select(subject, amplitude, condition, time, electrode) %>% 
+  filter(electrode %in% c("F1", "F3", "F5", "FC1", "FC3", "FC5", 
+                          "F2", "F4", "F6", "FC2", "FC4", "FC6")) %>% 
+  filter(condition == "control" | condition == "target") %>% 
+  mutate(emisphere = if_else(electrode %in% c("F1", "F3", "F5", "FC1", "FC3", "FC5"), "left", "right"), 
+         condition = as.ordered(condition)) %>% 
+  mutate(emi.cond = interaction(emisphere, condition)) %>% 
+  mutate(emi.cond = as.ordered(emi.cond))
+contrasts(ERP.gamms$condition) <- "contr.treatment"
+contrasts(ERP.gamms$emi.cond) <- "contr.treatment"
+```
+
+```{r}
+first.model <- bam(amplitude ~ 
+                     s(time, k = 40) + 
+                     condition + 
+                     s(time, by = condition, k = 50) +
+                     s(time, subject, bs = "fs", m = 1) + 
+                     s(time, electrode, bs = "fs", m = 1), 
+                   method = "ML", data = F.gamms)
+```
+
+```{r}
+plot_smooths(model = first.model, 
+             series = time, 
+             comparison = condition)
+             #facet_terms = emisphere,
+             #split = list(emi.cond = c("emisphere", "condition")))
+```
+
+### Parietal / Occipital
+
+```{r}
+P.gamms <- ERP %>% 
+  select(subject, amplitude, condition, time, electrode) %>% 
+  filter(electrode %in% c("P1", "P3", "P5", "CP1", "CP3", "CP5", 
+                          "P2", "P4", "P6", "CP2", "CP4", "CP6")) %>% 
+  filter(condition == "control" | condition == "target") %>% 
+  mutate(emisphere = if_else(electrode %in% c("P1", "P3", "P5", "CP1", "CP3", "CP5"), "left", "right"), 
+         condition = as.ordered(condition)) %>% 
+  mutate(emi.cond = interaction(emisphere, condition)) %>% 
+  mutate(emi.cond = as.ordered(emi.cond))
+contrasts(ERP.gamms$condition) <- "contr.treatment"
+contrasts(ERP.gamms$emi.cond) <- "contr.treatment"
+```
+
+```{r}
+second.model <- bam(amplitude ~ 
+                     s(time, k = 40) + 
+                     condition + 
+                     s(time, by = emi.cond, k = 50) +
+                     s(time, subject, bs = "fs", m = 1) + 
+                     s(time, electrode, bs = "fs", m = 1), 
+                   method = "ML", data = ERP.gamms)
+```
+
+```{r}
+plot_smooths(model = second.model, 
+             series = time, 
+             comparison = condition,
+             facet_terms = emisphere,
+             split = list(emi.cond = c("emisphere", "condition")))
+```
+
+
+## lmer
 
 ```{r readr.2, message = FALSE}
 ERP %<>% mutate(time = as.factor(time), subject = as.factor(subject)) %>%
