@@ -1,7 +1,7 @@
 ---
 title: "__Experiment 2:__ Data modelling"
 author: "Massimiliano Canzi | `massimiliano.canzi@uni-konstanz.de`"
-date: "Last modified: _20/02/2021_"
+date: "Last modified: _30/07/2023_"
 output: 
   html_document:
     toc: TRUE
@@ -19,9 +19,7 @@ library(tidyverse) # For everything else!
 library(tidymv)
 ```
 
-## Data pre-processing
-
-```{r readr.1, message = FALSE}
+```{r readr.1, message = FALSE, include = F}
 ERP <- read_csv("../data/EXP2.lmer.csv") %>%
   filter(Block == "ATT") %>%
   mutate(Subj = as.factor(Subj)) %>%
@@ -33,25 +31,32 @@ ERP <- read_csv("../data/EXP2.lmer.csv") %>%
 names(ERP) <- c("subject", "block", "condition", "time", "electrode", "amplitude")
 ```
 
-## GAMMs
-
-### Frontral
-
-```{r}
+```{r, include = F}
 F.gamms <- ERP %>% 
   select(subject, amplitude, condition, time, electrode) %>% 
-  filter(electrode %in% c("F1", "F3", "F5", "FC1", "FC3", "FC5", 
-                          "F2", "F4", "F6", "FC2", "FC4", "FC6")) %>% 
+  filter(electrode %in% c("F1", "F3", "F5", "FC1", "FC3", "FC5", "T7", 
+                          "F2", "F4", "F6", "FC2", "FC4", "FC6", "T8")) %>% 
   filter(condition == "control" | condition == "target") %>% 
-  mutate(emisphere = if_else(electrode %in% c("F1", "F3", "F5", "FC1", "FC3", "FC5"), "left", "right"), 
+  mutate(hemisphere = if_else(electrode %in% c("F1", "F3", "F5", "FC1", "FC3", "FC5", "T7"), 
+                             "Left Hemisphere", "Right Hemisphere"), 
          condition = as.ordered(condition)) %>% 
-  mutate(emi.cond = interaction(emisphere, condition)) %>% 
-  mutate(emi.cond = as.ordered(emi.cond))
-contrasts(ERP.gamms$condition) <- "contr.treatment"
-contrasts(ERP.gamms$emi.cond) <- "contr.treatment"
+  mutate(hemi.cond = interaction(hemisphere, condition)) %>% 
+  mutate(hemi.cond = as.ordered(hemi.cond))
+contrasts(F.gamms$condition) <- "contr.treatment"
+contrasts(F.gamms$hemi.cond) <- "contr.treatment"
 ```
 
-```{r}
+```{r gamm1, waning = F}
+null.model <- bam(amplitude ~ 
+                     s(time, k = 40) + 
+                     #condition + 
+                     #s(time, by = condition, k = 50) +
+                     s(time, subject, bs = "fs", m = 1) + 
+                     s(time, electrode, bs = "fs", m = 1), 
+                   method = "ML", data = F.gamms)
+```
+
+```{r gamm2, warning = F}
 first.model <- bam(amplitude ~ 
                      s(time, k = 40) + 
                      condition + 
@@ -61,175 +66,52 @@ first.model <- bam(amplitude ~
                    method = "ML", data = F.gamms)
 ```
 
-```{r}
-plot_smooths(model = first.model, 
-             series = time, 
-             comparison = condition)
-             #facet_terms = emisphere,
-             #split = list(emi.cond = c("emisphere", "condition")))
-```
-
-### Parietal / Occipital
-
-```{r}
-P.gamms <- ERP %>% 
-  select(subject, amplitude, condition, time, electrode) %>% 
-  filter(electrode %in% c("P1", "P3", "P5", "CP1", "CP3", "CP5", 
-                          "P2", "P4", "P6", "CP2", "CP4", "CP6")) %>% 
-  filter(condition == "control" | condition == "target") %>% 
-  mutate(emisphere = if_else(electrode %in% c("P1", "P3", "P5", "CP1", "CP3", "CP5"), "left", "right"), 
-         condition = as.ordered(condition)) %>% 
-  mutate(emi.cond = interaction(emisphere, condition)) %>% 
-  mutate(emi.cond = as.ordered(emi.cond))
-contrasts(ERP.gamms$condition) <- "contr.treatment"
-contrasts(ERP.gamms$emi.cond) <- "contr.treatment"
-```
-
-```{r}
-second.model <- bam(amplitude ~ 
+```{r gamm3, warning = F}
+hemi.model <- bam(amplitude ~ 
                      s(time, k = 40) + 
-                     condition + 
-                     s(time, by = emi.cond, k = 50) +
+                     hemi.cond + 
+                     s(time, by = hemi.cond, k = 50) +
                      s(time, subject, bs = "fs", m = 1) + 
                      s(time, electrode, bs = "fs", m = 1), 
-                   method = "ML", data = ERP.gamms)
+                   method = "ML", data = F.gamms)
 ```
 
 ```{r}
-plot_smooths(model = second.model, 
+compareML(null.model, first.model)
+```
+
+```{r}
+compareML(first.model, hemi.model)
+```
+
+```{r gamm4, warning = F}
+hemi.model <- bam(amplitude ~ 
+                     s(time, k = 40) + 
+                     hemi.cond + 
+                     s(time, by = hemi.cond, k = 50) +
+                     s(time, subject, bs = "fs", m = 1) + 
+                     s(time, electrode, bs = "fs", m = 1), 
+                   method = "fREML", data = F.gamms)
+```
+
+```{r, echo = F}
+plot_smooths(model = hemi.model, 
              series = time, 
-             comparison = condition,
-             facet_terms = emisphere,
-             split = list(emi.cond = c("emisphere", "condition")))
+             comparison = condition, 
+             facet_terms = hemisphere,
+             split = list(hemi.cond = c("hemisphere", "condition"))) + 
+  theme_minimal() + 
+  theme(legend.position = "top", aspect.ratio = 1/1.4) + 
+  geom_hline(yintercept = 0, linetype = "solid") + xlab("Time (in ms)") + 
+  ylab("Amplitude (in muV)") + 
+  geom_vline(xintercept = 0, linetype = "solid", width = 0.5) + 
+  scale_color_manual(values = c("indianred3", "deepskyblue4"), 
+                     name = "Experimental Condition", 
+                     labels = c("Control", "Target")) +
+  scale_fill_manual(values = c("indianred3", "deepskyblue4"), 
+                     name = "Experimental Condition", 
+                     labels = c("Control", "Target")) + 
+  scale_linetype_manual(values = c("dashed", "solid"), 
+                     name = "Experimental Condition", 
+                     labels = c("Control", "Target"))
 ```
-
-
-## lmer
-
-```{r readr.2, message = FALSE}
-ERP %<>% mutate(time = as.factor(time), subject = as.factor(subject)) %>%
-  group_by(subject, block, condition, electrode, time) %>% 
-  summarise(amplitude.mean = mean(amplitude),) %>% 
-  ungroup() %>% mutate(time = as.numeric(as.character(time)), 
-                       amplitude.mean = as.numeric(amplitude.mean), 
-                       electrode = as.factor(electrode)) %>%
-  filter(amplitude.mean <= 20 & amplitude.mean >= -20) %>%
-  mutate(amplitude.mean = as.numeric(format(round(amplitude.mean, 2), nsmall = 2)))
-```
-
-## Model preparation
-
-```{r summarised.data.function, message = F}
-summarised.data <- function(TP1, TP2, type = "main") {
-
-  if (type == "main") { 
-    lmer <- ERP %>% filter(condition == "control" | condition == "target") }
-  if (type == "syllable") {
-    lmer <- ERP %>% filter(condition != "control" & condition != "target") %>%
-      mutate(condition = as.factor(condition))}
-  
-  lmer.data <- left_join(lmer %>%
-    filter(time >= TP1) %>%
-    filter(time <= TP2) %>%
-      group_by(subject, block, condition, electrode) %>%
-      summarise(amplitude = mean(amplitude.mean),) %>% ungroup,
-    read.csv("../resources/lmer_electrodes.csv", 
-                        sep = ";"), by = "electrode") %>% 
-    rename(hemisphere = side) %>%
-    filter(hemisphere != "none") %>%
-    select(subject, hemisphere, region, condition, amplitude) %>%
-    group_by(subject, condition) %>%
-    mutate(subject = as.factor(paste0("S", subject))) %>%
-    mutate_if(is.character, as.factor)
-  
-  return(lmer.data) }
-```
-
-```{r control.REML, message = F}
-control <- lmerControl(check.conv.singular = "ignore")
-REML = TRUE
-```
-
-```{r head, message = F}
-head(summarised.data(75, 100, type = "syllable"))
-```
-
-## LMEM: 75-100 ms
-
-```{r model.75.100, message = F}
-model.75.100 <- summarised.data(75, 100) %>% 
-  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
-       REML = TRUE, control = control)
-```
-
-```{r Anova.model.7.100, message = F}
-anova(model.75.100, type = "III", ddf = "Kenward-Roger")
-emmeans(model.75.100, pairwise ~ condition | region)
-```
-
-## LMEM: 160-210 ms
-
-```{r model.160.210, message = F}
-model.160.210 <- summarised.data(160, 210) %>% 
-  lmer(formula = amplitude ~ condition * hemisphere + region + (1 | subject), 
-       control = control, REML = REML)
-```
-
-```{r Anova.model.160.210, message = F}
-anova(model.160.210, type = "III", ddf = "Kenward-Roger")
-emmeans(model.160.210, pairwise ~ condition | hemisphere)
-``` 
-
-## LMEM: 250-290 ms
-
-```{r model.250.290, message = F}
-model.250.290 <- summarised.data(250, 290) %>% 
-  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
-       control = control, REML = REML)
-```
-
-```{r Anova.model.250.290, message = F}
-anova(model.250.290, type = "III", ddf = "Kenward-Roger")
-emmeans(model.250.290, pairwise ~ condition | region)
-```
-
-## LMEM: 280-320 ms
-
-```{r model.280.320, message = F}
-model.280.320 <- summarised.data(280, 320) %>%
-  lmer(formula = amplitude ~ condition * region + region * hemisphere + 
-         (1 | subject), 
-       control = control, REML = REML)
-```
-
-```{r Anova.model.280.320, message = F}
-anova(model.280.320, type = "III", ddf = "Kenward-Roger")
-emmeans(model.280.320, pairwise ~ condition | region)
-```
-
-## LM: 575-625 ms
-
-```{r model.575.625, message = F}
-model.575.625 <- summarised.data(575, 625) %>%
-  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
-       control = control, REML = REML)
-```
-
-```{r Anova.model.575.625, message = F}
-anova(model.575.625, type = "III", ddf = "Kenward-Roger")
-emmeans(model.575.625, pairwise ~ condition | region)
-```
-
-## Syllable LMEM: 75-100
-
-```{r model.75.100.S, message = F}
-model.75.100 <- summarised.data(75, 100, type = "syllable") %>% 
-  lmer(formula = amplitude ~ condition * region + hemisphere + (1 | subject), 
-       REML = TRUE, control = control)
-```
-
-```{r Anova.model.75.100.S, message = F}
-anova(model.75.100, type = "III", ddf = "Kenward-Roger")
-emmeans(model.75.100, pairwise ~ condition | region)
-```
-
